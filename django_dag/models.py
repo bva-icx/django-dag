@@ -266,7 +266,12 @@ class NodeBase(object):
             raise ValidationError('The object is an ancestor.')
 
 
-def edge_factory(node_model, child_to_field = "id", parent_to_field = "id", concrete = True, base_model = models.Model):
+def edge_factory( node_model,
+        child_to_field = "id",
+        parent_to_field = "id",
+        concrete = True,
+        base_model = models.Model,
+    ):
     """
     Dag Edge factory
     """
@@ -286,8 +291,19 @@ def edge_factory(node_model, child_to_field = "id", parent_to_field = "id", conc
         class Meta:
             abstract = not concrete
 
-        parent = models.ForeignKey(node_model, related_name = "%s_child" % node_model_name, to_field = parent_to_field, on_delete=models.CASCADE)
-        child = models.ForeignKey(node_model, related_name = "%s_parent" % node_model_name, to_field = child_to_field, on_delete=models.CASCADE)
+        parent = models.ForeignKey(
+            node_model,
+            related_name = "%s_child" % node_model_name,
+            to_field = parent_to_field,
+            on_delete=models.CASCADE
+            )
+        child = models.ForeignKey(
+            node_model,
+            related_name = "%s_parent" % node_model_name,
+            to_field = child_to_field,
+            on_delete=models.CASCADE
+            )
+
 
         def __unicode__(self):
             return u"%s is child of %s" % (self.child, self.parent)
@@ -299,13 +315,17 @@ def edge_factory(node_model, child_to_field = "id", parent_to_field = "id", conc
 
     return Edge
 
-def node_factory(edge_model, children_null = True, base_model = models.Model):
+
+def node_factory( edge_model,
+        children_null = True,
+        base_model = models.Model,
+    ):
     """
     Dag Node factory
     """
     class Node(base_model, NodeBase):
         class Meta:
-            abstract        = True
+            abstract = True
 
         children  = models.ManyToManyField(
                 'self',
