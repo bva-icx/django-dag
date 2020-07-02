@@ -274,10 +274,84 @@ class NodeBase(object):
         return node._meta.model.children.rel.model
 
 
+class BaseDagOrderController():
+    """
+    Interface class to provide support for edge or node ordering.
+    """
+
+    def get_node_sequence_field(self, ):
+        """
+        Returns a single field to be used to support ordering.
+        Should the controller require more firlds this can be a primary key
+        to another model
+        """
+        raise NotImplementedError
+
+    def get_edge_sequence_field(self, ):
+        """
+        Returns a single field to be used to support ordering.
+        Should the controller require more firlds this can be a primary key
+        to another model
+        """
+        raise NotImplementedError
+
+    def between(self, instance, other):
+        """
+        Return a key half way between this and other - assuming no other
+        intermediate keys exist in the tree.
+        """
+        raise NotImplementedError
+
+    def next(self, instance):
+        """
+        Provide the next key in the sequence
+        """
+        raise NotImplementedError
+
+    def first(self,):
+        """
+        Provide the first key in the sequence
+        """
+        raise NotImplementedError
+
+    def get_sorted_pos_queryset(self, reference_node, parent=False):
+        """
+        :returns: A queryset of the nodes
+        """
+        raise NotImplementedError
+
+    def orderedChildren(self, parent):
+        """
+        :returns: A queryset of the nodes
+        this is slow
+        """
+        raise NotImplementedError
+
+    def get_first_child(self, reference_node):
+        return self.get_sorted_pos_queryset(
+            reference_node
+        ).first().child
+
+    def get_last_child(self, reference_node):
+        return self.get_sorted_pos_queryset(
+            reference_node
+        ).last().child
+
+    def get_first_parent(self, reference_node):
+        return self.get_sorted_pos_queryset(
+            reference_node, parent=True
+        ).first().child
+
+    def get_last_parent(self, reference_node):
+        return self.get_sorted_pos_queryset(
+            reference_node, parent=True
+        ).last().child
+
 
 def edge_factory( node_model,
         child_to_field = "id",
         parent_to_field = "id",
+        ordering = False,
         concrete = True,
         base_model = models.Model,
     ):
@@ -313,6 +387,9 @@ def edge_factory( node_model,
             on_delete=models.CASCADE
             )
 
+        if isinstance(ordering, BaseDagOrderController):
+            sequence = ordering.get_edge_sequence_field()
+            sequence_manager = ordering
 
         def __unicode__(self):
             return u"%s is child of %s" % (self.child, self.parent)
@@ -328,6 +405,8 @@ def edge_factory( node_model,
 def node_factory( edge_model,
         children_null = True,
         base_model = models.Model,
+        field = models.ManyToManyField,
+        ordering = False,
     ):
     """
     Dag Node factory
@@ -342,5 +421,25 @@ def node_factory( edge_model,
                 symmetrical = False,
                 through     = edge_model,
                 related_name = '_parents') # NodeBase.parents() is a function
+
+        if isinstance(ordering, BaseDagOrderController):
+            sequence = ordering.get_node_sequence_field()
+            sequence_manager = ordering
+
+            def get_first_child(self, ):
+                return self.sequence_manager.get_first_child(self)
+
+            def get_last_child(self):
+                return self.sequence_manager.get_last_child(self)
+
+            def get_first_parent(self, ):
+                return self.sequence_manager.get_first_parent(self)
+
+            def get_last_parent(self):
+                return self.sequence_manager.get_last_parent(self)
+
+            @property
+            def orderedChildren(self,):
+                return self.sequence_manager.orderedChildren(self)
 
     return Node
