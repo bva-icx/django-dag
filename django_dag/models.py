@@ -41,7 +41,6 @@ class NodeBase(object):
         cls = self.children.through(**kwargs)
         return cls.save(disable_circular_check=disable_check)
 
-
     def add_parent(self, parent, *args, **kwargs):
         """
         Adds a parent
@@ -64,7 +63,7 @@ class NodeBase(object):
         """
         Returns all elements which have 'self' as a direct descendant
         """
-        return self.__class__.objects.filter(children = self)
+        return self.get_node_model(self).objects.filter(children = self)
 
     def descendants_tree(self):
         """
@@ -254,7 +253,6 @@ class NodeBase(object):
             leaves.update(d._get_leaves(dt[d]))
         return leaves
 
-
     @staticmethod
     def circular_checker(parent, child):
         """
@@ -264,6 +262,17 @@ class NodeBase(object):
             raise ValidationError('Self links are not allowed.')
         if child in parent.ancestors_set():
             raise ValidationError('The object is an ancestor.')
+
+    @staticmethod
+    def get_node_model(node):
+        """
+        Get the node mode class.
+
+        This is needed to ensure we are not using the base node class used
+        during construction of the model.
+        """
+        return node._meta.model.children.rel.model
+
 
 
 def edge_factory( node_model,
@@ -310,7 +319,7 @@ def edge_factory( node_model,
 
         def save(self, *args, **kwargs):
             if not kwargs.pop('disable_circular_check', False):
-                self.parent.__class__.circular_checker(self.parent, self.child)
+                self.parent.get_node_model(self.parent).circular_checker(self.parent, self.child)
             super(Edge, self).save(*args, **kwargs) # Call the "real" save() method.
 
     return Edge
