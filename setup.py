@@ -3,7 +3,7 @@
 import os
 from setuptools import setup, find_packages
 
-version = '1.4.1'
+version = '1.5.0'
 
 classifiers = [
     "Development Status :: 4 - Beta",
