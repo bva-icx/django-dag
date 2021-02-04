@@ -295,23 +295,26 @@ class BaseDagOrderController():
         """
         raise NotImplementedError
 
-    def between(self, instance, other):
+    def key_between(self, instance, other):
         """
         Return a key half way between this and other - assuming no other
         intermediate keys exist in the tree.
         """
         raise NotImplementedError
 
-    def next(self, instance):
+    def next_key(self, instance, parent):
         """
         Provide the next key in the sequence
         """
         raise NotImplementedError
 
-    def first(self,):
+    def first_key(self):
         """
         Provide the first key in the sequence
         """
+        raise NotImplementedError
+
+    def get_childsort_query(self, reference_node):
         raise NotImplementedError
 
     def get_sorted_pos_queryset(self, reference_node, parent=False):
@@ -328,25 +331,44 @@ class BaseDagOrderController():
         raise NotImplementedError
 
     def get_first_child(self, reference_node):
-        return self.get_sorted_pos_queryset(
+        node = self.get_sorted_pos_queryset(
             reference_node
-        ).first().child
+        ).first()
+        return node.child if node else None
 
     def get_last_child(self, reference_node):
-        return self.get_sorted_pos_queryset(
+        node = self.get_sorted_pos_queryset(
             reference_node
-        ).last().child
+        ).last()
+        return node.child if node else None
 
     def get_first_parent(self, reference_node):
-        return self.get_sorted_pos_queryset(
+        node = self.get_sorted_pos_queryset(
             reference_node, parent=True
-        ).first().child
+        ).first()
+        return node.child if node else None
 
     def get_last_parent(self, reference_node):
-        return self.get_sorted_pos_queryset(
+        node = self.get_sorted_pos_queryset(
             reference_node, parent=True
-        ).last().child
+        ).last()
+        return node.child if node else None
 
+    def get_next_sibling(self, reference_node, parent_node):
+        raise NotImplementedError
+
+    def get_prev_sibling(self, reference_node, parent_node):
+        raise NotImplementedError
+
+    def get_first_sibling(self, reference_node, parent_node):
+        sibling_node_edge = self.orderedChildren(
+            parent_node).first()
+        return sibling_node_edge.child if sibling_node_edge else None
+
+    def get_last_sibling(self, reference_node, parent_node):
+        sibling_node_edge = self.orderedChildren(
+            parent_node).last()
+        return sibling_node_edge.child if sibling_node_edge else None
 
 def edge_factory( node_model,
         child_to_field = "id",
@@ -390,6 +412,8 @@ def edge_factory( node_model,
         if isinstance(ordering, BaseDagOrderController):
             sequence = ordering.get_edge_sequence_field()
             sequence_manager = ordering
+        else:
+            sequence_manager = None
 
         def __unicode__(self):
             return u"%s is child of %s" % (self.child, self.parent)
@@ -441,5 +465,8 @@ def node_factory( edge_model,
             @property
             def orderedChildren(self,):
                 return self.sequence_manager.orderedChildren(self)
+
+        else:
+            sequence_manager = None
 
     return Node
