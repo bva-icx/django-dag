@@ -59,11 +59,6 @@ class NodeBase(object):
         """
         parent.children.through.objects.get(parent = parent, child = self).delete()
 
-    def parents(self):
-        """
-        Returns all elements which have 'self' as a direct descendant
-        """
-        return self.get_node_model(self).objects.filter(children = self)
 
     def descendants_tree(self):
         """
@@ -79,7 +74,7 @@ class NodeBase(object):
         Returns a tree-like structure with ancestors
         """
         tree = {}
-        for f in self.parents():
+        for f in self.parents.all():
             tree[f] = f.ancestors_tree()
         return tree
 
@@ -109,12 +104,13 @@ class NodeBase(object):
             return cached_results[self]
         else:
             res = set()
-            for f in self.parents():
+            for f in self.parents.all():
                 res.add(f)
                 res.update(f.ancestors_set(cached_results=cached_results))
             cached_results[self] = res
             return res
 
+    # N
     def descendants_edges_set(self, cached_results=None):
         """
         Returns a set of descendants edges
@@ -141,7 +137,7 @@ class NodeBase(object):
             return cached_results[self]
         else:
             res = set()
-            for f in self.parents():
+            for f in self.parents.all():
                 res.add((f, self))
                 res.update(f.ancestors_edges_set(cached_results=cached_results))
             cached_results[self] = res
@@ -197,19 +193,19 @@ class NodeBase(object):
         """
         Check if has children and not ancestors
         """
-        return bool(self.children.exists() and not self._parents.exists())
+        return bool(self.children.exists() and not self.parents.exists())
 
     def is_leaf(self):
         """
         Check if has ancestors and not children
         """
-        return bool(self._parents.exists() and not self.children.exists())
+        return bool(self.parents.exists() and not self.children.exists())
 
     def is_island(self):
         """
         Check if has no ancestors nor children
         """
-        return bool(not self.children.exists() and not self._parents.exists())
+        return bool(not self.children.exists() and not self.parents.exists())
 
     def _get_roots(self, at):
         """
@@ -441,10 +437,10 @@ def node_factory( edge_model,
 
         children  = models.ManyToManyField(
                 'self',
-                blank       = children_null,
+                blank = children_null,
                 symmetrical = False,
-                through     = edge_model,
-                related_name = '_parents') # NodeBase.parents() is a function
+                through = edge_model,
+                related_name = 'parents')
 
         if isinstance(ordering, BaseDagOrderController):
             sequence = ordering.get_node_sequence_field()
