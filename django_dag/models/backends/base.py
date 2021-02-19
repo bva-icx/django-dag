@@ -187,31 +187,35 @@ class BaseNode(object):
         """
         raise NotImplementedError()
 
-    def get_paths(self, target, include_root=False, include_target=True):
+    def get_paths(self, target, use_edges=False):
         """
         Finds a list of the shortest paths between two nodes.
 
-        For each path found this is a list of the nodes not including the search
-        root node, but
-        including the target with the node are returned in path order.
+        Each of the found paths are:
+            A list of nodes corresponding to the sequence needed to move from
+            the source node (self) to the target node.
+
+            Each step in the sequence can be represented by:
+                * the target node [default]
+                * the edge [if use_edges set True]
+
+            If the source node and the target are the same node then an empty path is
+            returned.
+            If the source and target node are not connected then the
+            NodeNotReachableException exception is raised
+
+        The order of the list of paths is undefined.
 
         :raises: NodeNotReachableException
+
+        :params use_edges: Controls the return object
+             If True: return the edges joining nodes.
+             If False: (default) return the target node
         :rtype: list<QuerySet<Node>>
         :return:  List of query sets for each
         """
         raise NotImplementedError()
 
-    def path(self,):
-        """
-        The first found path between two nodes that is the shortest
-
-        The node are returned in path order excluding the source node but
-        including the target node
-        :raises: NodeNotReachableException
-        :rtype: QuerySet<Node>
-        :return:  List of query sets for each
-        """
-        return self.paths[0]
 
     def get_roots(self):
         """
@@ -242,3 +246,14 @@ class BaseNode(object):
     @deprecated()
     def ancestors_set(self):
         return self.ancestors
+
+    @deprecated()
+    def path(self,):
+        """
+        The first found path between two nodes that is the shortest
+        (see get_nodes())
+        :raises: NodeNotReachableException
+        :rtype: QuerySet<Node>
+        :return:  List of query sets for each
+        """
+        return self.get_paths()[0]
