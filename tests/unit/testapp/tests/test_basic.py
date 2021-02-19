@@ -285,7 +285,6 @@ class DagStructureTests(TestCase):
             self.expand_path(self.nodes.p5.get_paths(self.nodes.p5)), [[]]
             )
 
-    @unittest.expectedFailure
     def test_path_can_return_edges(self,):
         self.assertEqual(
             [
