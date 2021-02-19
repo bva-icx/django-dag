@@ -256,13 +256,25 @@ class DagStructureTests(TestCase):
         #     `-- <BasicNode: # 9>
         #         `-- <BasicNode: # 10>
 
+    def expand_path(self, paths):
+        return[
+            [p.name for p in path] for path in paths
+        ]
 
-    def test_path_between_nodes(self,):
-        #FIXME: what about path 1-7 of ['5', '7']
-        self.assertEqual([p.name for p in self.nodes.p1.path(self.nodes.p7)], ['6', '7'])
-        self.assertEqual([p.name for p in self.nodes.p1.path(self.nodes.p10)], ['6', '9', '10'])
+    def test_path_between_nodes_downards(self,):
+        self.assertEqual(
+            self.expand_path(self.nodes.p1.get_paths(self.nodes.p7)),
+            [
+                ['5', '7'],
+                ['6', '7'],
+            ])
+        self.assertEqual(self.expand_path(self.nodes.p1.get_paths(self.nodes.p10)), [['6', '9', '10']])
+        self.assertEqual(self.expand_path(self.nodes.p6.get_paths(self.nodes.p10)), [['9', '10']])
+        self.nodes.p3.add_child(self.nodes.p4)
+        self.nodes.p3.remove_child(self.nodes.p9)
+        self.assertEqual(self.expand_path(self.nodes.p4.get_paths(self.nodes.p10)), [['6', '9', '10']])
+        self.assertEqual(self.expand_path(self.nodes.p3.get_paths(self.nodes.p10)), [['4', '6', '9', '10']])
 
-    def test_distance_between_nodes(self,):
         self.assertEqual(self.nodes.p1.distance(self.nodes.p7), 2)
 
     def test_can_get_root_and_leaf_nodes_from_node(self,):

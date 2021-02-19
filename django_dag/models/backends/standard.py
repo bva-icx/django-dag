@@ -36,23 +36,41 @@ class ProtoNode(BaseNode):
             cached_results[self.pk] = res
             return res
 
-    def path(self, target):
+    def get_paths(self, target, use_edges=False):
         if self == target:
-            return []
+            # There can only be 1 zero length path, it also has no edge
+            # so we can always return [] for the path
+            return [[],]
         if target in self.children.all():
-            return [target]
-        if target in self.descendants:
-            path = None
+            # If the target is a child of the source object there can only
+            # be 1 shortest path
+            if use_edges:
+                return [ self.get_edge_model().objects.filter(
+                        child=target,
+                        parent=self
+                    ), ]
+            else:
+                return [[target],]
+
+        if target.pk in self.descendant_pks():
+            paths = []
+            path_length = 0
             for d in self.children.all():
                 try:
-                    desc_path = d.path(target)
-                    if not path or len(desc_path) < len(path):
-                        path = [d] + desc_path
+                    desc_paths = d.get_paths(target, use_edges=use_edges)
+                    desc_path_length = len(desc_paths[0]) + 1
+                    if not paths or desc_path_length < path_length:
+                        paths = [ [d] + subpath for subpath in desc_paths ]
+                        path_length = len(paths[0])
+                    elif bool(paths) and desc_path_length == path_length:
+                        equal_paths = [ [d] + subpath for subpath in desc_paths ]
+                        paths.extend(equal_paths)
+
                 except NodeNotReachableException:
                     pass
         else:
             raise NodeNotReachableException()
-        return path
+        return paths
 
     def get_roots(self):
         """
