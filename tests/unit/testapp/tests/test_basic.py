@@ -6,6 +6,7 @@ from django.shortcuts import render_to_response
 from django.core.exceptions import ValidationError
 from .tree_test_output import expected_tree_output
 from ..models.basic import BasicNode, BasicEdge, BasicNodeES, BasicEdgeES
+from django_dag.exceptions import NodeNotReachableException
 
 class NodeStorage():
     pass
@@ -275,6 +276,26 @@ class DagStructureTests(TestCase):
         self.assertEqual(self.expand_path(self.nodes.p4.get_paths(self.nodes.p10)), [['6', '9', '10']])
         self.assertEqual(self.expand_path(self.nodes.p3.get_paths(self.nodes.p10)), [['4', '6', '9', '10']])
 
+    def test_path_raise_for_unattached_nodes(self,):
+        with self.assertRaises(NodeNotReachableException) as add_err_cm:
+            self.nodes.p7.get_paths(self.nodes.p10)
+
+    def test_path_for_same_node_is_empty_list(self,):
+        self.assertEqual(
+            self.expand_path(self.nodes.p5.get_paths(self.nodes.p5)), [[]]
+            )
+
+    @unittest.expectedFailure
+    def test_path_can_return_edges(self,):
+        self.assertEqual(
+            [
+                (edge.parent.name, edge.child.name)
+                for edge in self.nodes.p4.get_paths(self.nodes.p10, use_edges=True)[0]
+            ],
+            [ ('4','6'), ('6','9'), ('9','10') ]
+            )
+
+    def test_distance_between_nodes(self,):
         self.assertEqual(self.nodes.p1.distance(self.nodes.p7), 2)
 
     def test_can_get_root_and_leaf_nodes_from_node(self,):
