@@ -64,21 +64,18 @@ class ProtoNode(BaseNode):
         if target.pk in self.descendant_pks():
             paths = []
             path_length = 0
-            if use_edges:
-                childItems = self.get_edge_model(self).objects.filter(
-                        parent=self
-                    )
-            else:
-                childItems = self.children.all()
-            for child in childItems:
-                node = child if downwards else self
+            childItems = self.get_edge_model(self).objects.filter(
+                    parent=self
+                )
+
+            for child_edge in childItems:
+                if use_edges:
+                    node = child_edge
+                else:
+                    node = child_edge.child if downwards else child_edge.parent
                 try:
-                    if use_edges:
-                        desc_paths = child.child._get_paths(target,
-                            use_edges=use_edges,downwards=downwards)
-                    else:
-                        desc_paths = child._get_paths(target,
-                            use_edges=use_edges,downwards=downwards)
+                    desc_paths = child_edge.child._get_paths(target,
+                        use_edges=use_edges,downwards=downwards)
                     desc_path_length = len(desc_paths[0]) + 1
                     if not paths or desc_path_length < path_length:
                         paths = [ [node] + subpath for subpath in desc_paths ]

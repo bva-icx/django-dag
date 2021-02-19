@@ -262,7 +262,7 @@ class DagStructureTests(TestCase):
             [p.name for p in path] for path in paths
         ]
 
-    def test_path_between_nodes_downards(self,):
+    def test_path_between_nodes_downwards(self,):
         self.assertEqual(
             self.expand_path(self.nodes.p1.get_paths(self.nodes.p7)),
             [
@@ -293,6 +293,14 @@ class DagStructureTests(TestCase):
             ],
             [ ('4','6'), ('6','9'), ('9','10') ]
             )
+        self.assertEqual(
+            [
+                (edge.parent.name, edge.child.name)
+                for edge in self.nodes.p10.get_paths(self.nodes.p4, use_edges=True)[0]
+            ],
+            [ ('4','6'), ('6','9'), ('9','10') ]
+            )
+
 
     def test_path_between_nodes_upwards(self,):
         self.assertEqual(
