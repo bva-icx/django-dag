@@ -84,6 +84,7 @@ class BaseNode(object):
     def clan(self):
         return self.filter_order_ids(self.clan_pks())
 
+    @property
     def is_root(self):
         """
         Check if has children and not ancestors
@@ -93,6 +94,7 @@ class BaseNode(object):
         """
         return bool(self.children.exists() and not self.parents.exists())
 
+    @property
     def is_leaf(self):
         """
         Check if has ancestors and not children
@@ -102,6 +104,7 @@ class BaseNode(object):
         """
         return bool(self.parents.exists() and not self.children.exists())
 
+    @property
     def is_island(self):
         """
         Check if has no ancestors nor children

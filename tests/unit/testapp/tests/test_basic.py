@@ -270,12 +270,12 @@ class DagStructureTests(TestCase):
         self.assertEqual([p.name for p in self.nodes.p8.get_roots()], ['1', '2', '4'])
 
     def test_node_know_if_it_a_root_or_leaf_node(self,):
-        self.assertTrue(self.nodes.p1.is_root())
-        self.assertFalse(self.nodes.p1.is_leaf())
-        self.assertFalse(self.nodes.p10.is_root())
-        self.assertTrue(self.nodes.p10.is_leaf())
-        self.assertFalse(self.nodes.p6.is_leaf())
-        self.assertFalse(self.nodes.p6.is_root())
+        self.assertTrue(self.nodes.p1.is_root)
+        self.assertFalse(self.nodes.p1.is_leaf)
+        self.assertFalse(self.nodes.p10.is_root)
+        self.assertTrue(self.nodes.p10.is_leaf)
+        self.assertFalse(self.nodes.p6.is_leaf)
+        self.assertFalse(self.nodes.p6.is_root)
 
     def test_can_remove_leaf_child(self):
         """Test we can remove a leaf child node"""
@@ -288,7 +288,7 @@ class DagStructureTests(TestCase):
             parent=self.nodes.p9,
             child=self.nodes.p10
             ).exists())
-        self.assertTrue(self.nodes.p10.is_island())
+        self.assertTrue(self.nodes.p10.is_island)
 
     def test_can_remove_root_child(self):
         """Test we can remove a leaf child node"""
@@ -301,8 +301,8 @@ class DagStructureTests(TestCase):
             parent=self.nodes.p1,
             child=self.nodes.p5
             ).exists())
-        self.assertTrue(self.nodes.p5.is_root())
-        self.assertFalse(self.nodes.p2.is_island())
+        self.assertTrue(self.nodes.p5.is_root)
+        self.assertFalse(self.nodes.p2.is_island)
         self.assertIn(self.nodes.p7, self.nodes.p5.children.all())
 
     def test_can_remove_mid_child(self):
@@ -317,8 +317,8 @@ class DagStructureTests(TestCase):
             child=self.nodes.p9
             ).exists())
 
-        self.assertFalse(self.nodes.p9.is_island())
-        self.assertFalse(self.nodes.p6.is_island())
+        self.assertFalse(self.nodes.p9.is_island)
+        self.assertFalse(self.nodes.p6.is_island)
 
     def test_can_find_ancestors(self):
         self.assertEqual([p.name for p in self.nodes.p6.ancestors_set()], ['1', '2', '4'])
