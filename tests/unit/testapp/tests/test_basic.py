@@ -294,6 +294,20 @@ class DagStructureTests(TestCase):
             [ ('4','6'), ('6','9'), ('9','10') ]
             )
 
+    def test_path_between_nodes_upwards(self,):
+        self.assertEqual(
+            self.expand_path(self.nodes.p7.get_paths(self.nodes.p1)),
+            [
+                ['1','5'],
+                ['1','6'],
+            ])
+        self.assertEqual(self.expand_path(self.nodes.p10.get_paths(self.nodes.p1)), [['1', '6', '9']])
+        self.assertEqual(self.expand_path(self.nodes.p10.get_paths(self.nodes.p6)), [['6', '9']])
+        self.nodes.p3.add_child(self.nodes.p4)
+        self.nodes.p3.remove_child(self.nodes.p9)
+        self.assertEqual(self.expand_path(self.nodes.p10.get_paths(self.nodes.p4)), [['4', '6', '9']])
+        self.assertEqual(self.expand_path( self.nodes.p10.get_paths(self.nodes.p3)), [['3', '4', '6', '9']])
+
     def test_distance_between_nodes(self,):
         self.assertEqual(self.nodes.p1.distance(self.nodes.p7), 2)
 

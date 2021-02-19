@@ -36,7 +36,16 @@ class ProtoNode(BaseNode):
             cached_results[self.pk] = res
             return res
 
-    def get_paths(self, target, use_edges=False):
+    def get_paths(self, target, use_edges=False, downwards=None):
+        try:
+            if downwards is None or downwards is True:
+                return self._get_paths(target, use_edges=use_edges, downwards=True)
+        except NodeNotReachableException as err:
+            if downwards is True:
+                raise
+        return target._get_paths(self, use_edges=use_edges, downwards=False)
+
+    def _get_paths(self, target, use_edges=False, downwards=True):
         if self == target:
             # There can only be 1 zero length path, it also has no edge
             # so we can always return [] for the path
@@ -50,7 +59,7 @@ class ProtoNode(BaseNode):
                         parent=self
                     )), ]
             else:
-                return [[target],]
+                return [[target if downwards else self],]
 
         if target.pk in self.descendant_pks():
             paths = []
@@ -61,18 +70,21 @@ class ProtoNode(BaseNode):
                     )
             else:
                 childItems = self.children.all()
-            for d in childItems:
+            for child in childItems:
+                node = child if downwards else self
                 try:
                     if use_edges:
-                        desc_paths = d.child.get_paths(target, use_edges=use_edges)
+                        desc_paths = child.child._get_paths(target,
+                            use_edges=use_edges,downwards=downwards)
                     else:
-                        desc_paths = d.get_paths(target, use_edges=use_edges)
+                        desc_paths = child._get_paths(target,
+                            use_edges=use_edges,downwards=downwards)
                     desc_path_length = len(desc_paths[0]) + 1
                     if not paths or desc_path_length < path_length:
-                        paths = [ [d] + subpath for subpath in desc_paths ]
+                        paths = [ [node] + subpath for subpath in desc_paths ]
                         path_length = len(paths[0])
                     elif bool(paths) and desc_path_length == path_length:
-                        equal_paths = [ [d] + subpath for subpath in desc_paths ]
+                        equal_paths = [ [node] + subpath for subpath in desc_paths ]
                         paths.extend(equal_paths)
 
                 except NodeNotReachableException:

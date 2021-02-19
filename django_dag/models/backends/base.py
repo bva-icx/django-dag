@@ -187,7 +187,7 @@ class BaseNode(object):
         """
         raise NotImplementedError()
 
-    def get_paths(self, target, use_edges=False):
+    def get_paths(self, target, use_edges=False, downwards=None):
         """
         Finds a list of the shortest paths between two nodes.
 
@@ -211,6 +211,14 @@ class BaseNode(object):
         :params use_edges: Controls the return object
              If True: return the edges joining nodes.
              If False: (default) return the target node
+        :params downwards: Controls the return object
+            If None: (default) Bi-Directional search.
+            If True: Down the tree, parent to child.
+            If False: up the tree child to parent
+
+            If the target is the first in the list then it is an ancestor of the
+            source else if it is the last it is a descendant of the source node.
+
         :rtype: list<QuerySet<Node>>
         :return:  List of query sets for each
         """
@@ -274,4 +282,5 @@ class BaseNode(object):
         :rtype: QuerySet<Node>
         :return:  List of query sets for each
         """
-        return self.get_paths(target)[0]
+        return self.get_paths(target,
+                use_edges=False, downwards=True)[0]
