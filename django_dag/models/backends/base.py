@@ -235,6 +235,16 @@ class BaseNode(object):
         """
         raise NotImplementedError()
 
+    ################################################################
+    # Legacy functions
+    @deprecated()
+    def node_set(self):
+        return self.clan
+
+    @deprecated()
+    def descendants_set(self):
+        return self.descendants
+
     @deprecated()
     def node_set(self):
         return self.clan
@@ -248,7 +258,15 @@ class BaseNode(object):
         return self.ancestors
 
     @deprecated()
-    def path(self,):
+    def descendants_tree(self):
+        return self.get_descendants_tree()
+
+    @deprecated()
+    def ancestors_tree(self):
+        return self.get_ancestors_tree()
+
+    @deprecated()
+    def path(self, target):
         """
         The first found path between two nodes that is the shortest
         (see get_nodes())
@@ -256,4 +274,4 @@ class BaseNode(object):
         :rtype: QuerySet<Node>
         :return:  List of query sets for each
         """
-        return self.get_paths()[0]
+        return self.get_paths(target)[0]
