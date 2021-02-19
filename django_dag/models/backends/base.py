@@ -1,6 +1,7 @@
 from django.db import models, connection
 from django.core.exceptions import ValidationError
 from django.db.models import Case, When
+from django_dag.exceptions import NodeNotReachableException
 
 from deprecation import deprecated
 
@@ -154,11 +155,15 @@ class BaseNode(object):
     def distance(self, target):
         """
         Finds the shortest hops count to the target vertex
-
+        :raises: NodeNotReachableException
         :rtype: int
         :return: The shortest hops count to the target vertex
         """
-        return len(self.path(target))
+        try:
+            return len(self.get_paths(target, downwards=True)[0])
+        except NodeNotReachableException as err:
+            pass
+        return - len(self.get_paths(target, downwards=False)[0])
 
     def clan_pks(self):
         """
@@ -204,10 +209,11 @@ class BaseNode(object):
             If the source and target node are not connected then the
             NodeNotReachableException exception is raised
 
+        If the target is the first in the list then it is an ancestor of the
+        source else if it is the last it is a descendant of the source node.
         The order of the list of paths is undefined.
 
         :raises: NodeNotReachableException
-
         :params use_edges: Controls the return object
              If True: return the edges joining nodes.
              If False: (default) return the target node
@@ -216,14 +222,11 @@ class BaseNode(object):
             If True: Down the tree, parent to child.
             If False: up the tree child to parent
 
-            If the target is the first in the list then it is an ancestor of the
-            source else if it is the last it is a descendant of the source node.
 
         :rtype: list<QuerySet<Node>>
         :return:  List of query sets for each
         """
         raise NotImplementedError()
-
 
     def get_roots(self):
         """
