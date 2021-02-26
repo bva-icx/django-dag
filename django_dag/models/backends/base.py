@@ -68,22 +68,28 @@ class BaseNode(object):
         """
         return getattr(cls._meta.model, linkname).rel.through
 
-    def filter_order_ids(self, pk_list, respect_manager=True):
+    def filter_order_node_ids(self, pk_list, respect_manager=True):
         if respect_manager:
             return filter_order(self._meta.default_manager, 'pk', pk_list)
         return filter_order(self._meta.base_manager, 'pk', pk_list)
 
+    def filter_order_edge_ids(self, pk_list, respect_manager=True):
+        model = self.get_edge_model()
+        if respect_manager:
+            return filter_order(model._meta.default_manager, 'pk', pk_list)
+        return filter_order(model._meta.base_manager, 'pk', pk_list)
+
     @property
     def ancestors(self):
-        return self.filter_order_ids(self.ancestor_pks())
+        return self.filter_order_node_ids(self.ancestor_pks())
 
     @property
     def descendants(self):
-        return self.filter_order_ids(self.descendant_pks())
+        return self.filter_order_node_ids(self.descendant_pks())
 
     @property
     def clan(self):
-        return self.filter_order_ids(self.clan_pks())
+        return self.filter_order_node_ids(self.clan_pks())
 
     @property
     def is_root(self):
