@@ -49,10 +49,10 @@ class DagTestCase(TestCase):
                 p2.add_child(p4)
 
             # Compute descendants of a root node
-            BasicNode.objects.get(pk=0).descendants_set()
+            BasicNode.objects.get(pk=0).descendants
 
             # Compute ancestors of a leaf node
-            BasicNode.objects.get(pk=2*n - 1).ancestors_set()
+            BasicNode.objects.get(pk=2*n - 1).ancestors
 
             BasicNode.objects.get(pk=0).add_child(BasicNode.objects.get(pk=2*n - 1))
 
@@ -376,7 +376,10 @@ class DagStructureTests(TestCase):
         self.assertFalse(self.nodes.p6.is_island)
 
     def test_can_find_ancestors(self):
-        self.assertEqual([p.name for p in self.nodes.p6.ancestors_set()], ['1', '2', '4'])
+        self.assertEqual(
+            sorted([p.name for p in self.nodes.p6.ancestors], key=int),
+            ['1', '2', '4'])
+
 
     def test_dag_tree_render(self):
         # Testing the view
