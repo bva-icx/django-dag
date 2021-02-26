@@ -7,6 +7,8 @@ Some ideas stolen from:
 """
 from django.db import models
 
+from .order_control import BaseDagOrderController
+
 def edge_factory( node_model,
         child_to_field = "id",
         parent_to_field = "id",
@@ -42,7 +44,7 @@ def edge_factory( node_model,
             on_delete=models.CASCADE
             )
 
-        if False:#isinstance(ordering, BaseDagOrderController):
+        if isinstance(ordering, BaseDagOrderController):
             sequence_field_name = ordering.sequence_field_name
             locals()[sequence_field_name] = ordering.get_edge_sequence_field()
             sequence_manager = ordering
@@ -148,7 +150,7 @@ def node_factory( edge_model,
                 through = edge_model,
                 related_name = 'parents')
 
-        if False:#isinstance(ordering, BaseDagOrderController):
+        if isinstance(ordering, BaseDagOrderController):
             sequence_field_name = ordering.sequence_field_name
             locals()[sequence_field_name] = ordering.get_node_sequence_field()
             sequence_manager = ordering
