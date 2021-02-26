@@ -380,6 +380,19 @@ class DagStructureTests(TestCase):
             sorted([p.name for p in self.nodes.p6.ancestors], key=int),
             ['1', '2', '4'])
 
+    def test_can_find_descendants(self):
+        self.assertEqual(
+            sorted([p.name for p in self.nodes.p1.descendants], key=int),
+            ['5', '6', '7', '8', '9', '10'])
+
+
+    def test_can_find_clan(self):
+        self.assertEqual(
+            sorted([p.name for p in self.nodes.p5.clan], key=int),
+            ['1', '5', '7'])
+        self.assertEqual(
+            sorted([p.name for p in self.nodes.p6.clan], key=int),
+            ['1', '2', '4', '6', '7', '8', '9', '10'])
 
     def test_dag_tree_render(self):
         # Testing the view
