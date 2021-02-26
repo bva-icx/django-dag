@@ -2,14 +2,11 @@
 from django.db.models import CharField, Model
 from django_dag.models import node_factory, edge_factory
 
-class Base(Model):
-    pass
-
-
-
+################################################################
+# Almost the simplist of DAG models
 class BasicNode(node_factory('BasicEdge')):
     """
-    Test node, adds just one field
+    Simple Test Node with name field
     """
     name = CharField(max_length=32)
 
@@ -21,7 +18,7 @@ class BasicNode(node_factory('BasicEdge')):
 
 class BasicEdge(edge_factory('BasicNode', concrete=False)):
     """
-    Test edge, adds just one field
+    Simple Test Edge with name field
     """
     name = CharField(max_length=32, blank=True, null=True)
 
@@ -29,10 +26,11 @@ class BasicEdge(edge_factory('BasicNode', concrete=False)):
         app_label = 'testapp'
 
 
-
+################################################################
+# A Dag which return the created Edge on adding nodes
 class BasicNodeES(node_factory('BasicEdgeES')):
     """
-    Test node, adds just one field
+    Simple Test node for Edge Save Support
     """
     name = CharField(max_length=32)
 
@@ -60,5 +58,3 @@ class BasicEdgeES(edge_factory('BasicNodeES', concrete=False)):
         # return the edge used to link the parent to the child
         super().save(*args, **kwargs)
         return self
-
-
