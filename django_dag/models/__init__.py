@@ -6,6 +6,9 @@ Some ideas stolen from:
     from https://github.com/stdbrouw/django-treebeard-dag
 """
 from django.db import models
+from django.conf import settings
+from importlib import import_module
+
 
 from .order_control import BaseDagOrderController
 
@@ -135,10 +138,10 @@ def node_factory( edge_model,
     ):
     """Dag Node factory"""
 
-    from .backends.standard import ProtoNode
-    #mgr, qset = node_manager_factory(base_model, ordering)
+    module_name = getattr(settings, 'DJANGO_DAG_BACKEND', "django_dag.models.backends.standard")
+    backend = import_module(module_name)
 
-    class Node(base_model, ProtoNode):
+    class Node(base_model, backend.ProtoNode):
         class Meta:
             abstract = True
 
