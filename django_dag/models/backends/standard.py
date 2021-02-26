@@ -54,7 +54,7 @@ class ProtoNode(BaseNode):
             # If the target is a child of the source object there can only
             # be 1 shortest path
             if use_edges:
-                return [ list(self.get_edge_model(self).objects.filter(
+                return [ list(self.get_edge_model().objects.filter(
                         child=target,
                         parent=self
                     )), ]
@@ -64,7 +64,7 @@ class ProtoNode(BaseNode):
         if target.pk in self.descendant_pks():
             paths = []
             path_length = 0
-            childItems = self.get_edge_model(self).objects.filter(
+            childItems = self.get_edge_model().objects.filter(
                     parent=self
                 )
 

@@ -46,8 +46,8 @@ class BaseNode(object):
         if child.pk in parent.ancestor_pks():
             raise ValidationError('The object is an ancestor.')
 
-    @staticmethod
-    def get_node_model(node, linkname='children'):
+    @classmethod
+    def get_node_model(cls, linkname='children'):
         """
         Get the node mode class used for this relation link.
 
@@ -57,16 +57,16 @@ class BaseNode(object):
 
         :param linkname: The name of the field that links the nodes
         """
-        return getattr(node._meta.model, linkname).rel.model
+        return getattr(cls._meta.model, linkname).rel.model
 
-    @staticmethod
-    def get_edge_model(node, linkname='children'):
+    @classmethod
+    def get_edge_model(cls, linkname='children'):
         """
         Get the edge model class used for this relation link
 
         :param linkname: The name of the field that links the nodes
         """
-        return getattr(node._meta.model, linkname).rel.through
+        return getattr(cls._meta.model, linkname).rel.through
 
     def filter_order_ids(self, pk_list, respect_manager=True):
         if respect_manager:
