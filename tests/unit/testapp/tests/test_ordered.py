@@ -162,6 +162,10 @@ class EdgeSortedDagRelationshipTests(TestCase):
             list(self.nodes.p2.children.ordered().values_list('pk', '_sequence')),
             [(5,1), (7,4), (6,8)])
 
+    @unittest.skip('no exception or test written as yet')
+    def test_handle_ordered_filter_on_node_as_invalid(self):
+        pass
+
     def test_parent_ordered_filter(self):
         self.assertEqual(
             list(self.nodes.p5.parents.ordered().values_list('pk', '_sequence')),

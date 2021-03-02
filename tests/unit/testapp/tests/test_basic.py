@@ -385,6 +385,15 @@ class DagStructureTests(TestCase):
             sorted([p.name for p in self.nodes.p1.descendants], key=int),
             ['5', '6', '7', '8', '9', '10'])
 
+    @unittest.skip('we need to define the contract')
+    def test_ordering_of_descendant_nodes(self):
+        # Note: What ordering promises fo we make?
+        pass
+
+    @unittest.skip('we need to define the contract')
+    def test_ordering_of_ancestor_nodes(self):
+        # Note: What ordering promises fo we make?
+        pass
 
     def test_can_find_clan(self):
         self.assertEqual(
