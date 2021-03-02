@@ -55,7 +55,6 @@ class DagOrderindBasicTests(TestCase):
     def test_can_add_a_child_with_node_order(self):
         pass
 
-    @unittest.expectedFailure
     def test_can_use_node_insert_after_at_ends_uses_key_next(self):
         self.nodes_eo.p1.add_child(self.nodes_eo.p6, sequence=8)
         self.nodes_eo.p1.add_child(self.nodes_eo.p7, sequence=4)
@@ -101,7 +100,6 @@ class DagOrderindBasicTests(TestCase):
     def test_can_use_node_insert_before_raises_is_not_attached(self):
         pass
 
-    @unittest.expectedFailure
     def test_can_use_node_insert_after_uses_key_between(self):
         self.nodes_eo.p1.add_child(self.nodes_eo.p5, sequence=12)
         self.nodes_eo.p1.add_child(self.nodes_eo.p7, sequence=4)
@@ -118,7 +116,6 @@ class DagOrderindBasicTests(TestCase):
             ),
             [(1, 5, 12), (1, 6, 8), (1, 7, 4), (2, 5, 1), (2, 6, 7), (2, 7, 5)])
 
-    @unittest.expectedFailure
     def test_can_use_node_insert_before_uses_key_between(self):
         self.nodes_eo.p1.add_child(self.nodes_eo.p5, sequence=12)
         self.nodes_eo.p1.add_child(self.nodes_eo.p7, sequence=4)
