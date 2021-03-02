@@ -253,6 +253,48 @@ class BaseNode(object):
         raise NotImplementedError()
 
     ################################################################
+    # functions that are redirected to the sequence_manager
+    def get_first_child(self):
+        return self.sequence_manager.get_first_child(self)
+
+    def get_last_child(self):
+        return self.sequence_manager.get_last_child(self)
+
+    def get_first_parent(self):
+        return self.sequence_manager.get_first_parent(self)
+
+    def get_last_parent(self):
+        return self.sequence_manager.get_last_parent(self)
+
+    def get_next_sibling(self, parent_node):
+        return self.sequence_manager.get_next_sibling(self, parent_node)
+
+    def get_prev_sibling(self, parent_node):
+        return self.sequence_manager.get_prev_sibling(self, parent_node)
+
+    def insert_child_before(self, descendant, before, **kwargs):
+        """
+        Adds a node to the current node as a child directly before a sibling.
+
+        :param descendant: The child node to add
+        :param before: The child node to add
+        :return: return result from edge link save
+        """
+        return self.sequence_manager.insert_child_before(
+            descendant, self, before, **kwargs)
+
+    def insert_child_after(self, descendant, after, **kwargs):
+        """
+        Adds a node to the current node as a child directly after a sibling.
+
+        :param descendant: The child node to add
+        :param after: The child node to add
+        :return: return result from edge link save
+        """
+        return self.sequence_manager.insert_child_after(
+            descendant, self, after, **kwargs)
+
+    ################################################################
     # Legacy functions
     @deprecated()
     def node_set(self):

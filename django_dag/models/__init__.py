@@ -108,14 +108,6 @@ def node_manager_factory(base_model, ordering=None):
                     instance_or_model, target, source)
             ).order_by('_sequence')
 
-        def get_first_child(self, ):
-            return self.sequence_manager.get_first_child(self)
-        def get_last_child(self):
-            return self.sequence_manager.get_last_child(self)
-        def get_first_parent(self, ):
-            return self.sequence_manager.get_first_parent(self)
-        def get_last_parent(self):
-            return self.sequence_manager.get_last_parent(self)
 
         #def get_queryset(self):
         #    qs = super().get_queryset()
@@ -140,7 +132,6 @@ def node_factory( edge_model,
 
     module_name = getattr(settings, 'DJANGO_DAG_BACKEND', "django_dag.models.backends.standard")
     backend = import_module(module_name)
-
     class Node(base_model, backend.ProtoNode):
         class Meta:
             abstract = True
