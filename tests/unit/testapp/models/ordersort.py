@@ -40,7 +40,8 @@ class DagNodeIntSorter(BaseDagOrderController):
 
         :return: django F() expressions
         """
-        return F('sequence')
+        return F(self.sequence_field_name)
+
     def get_sorted_edge_queryset(self, node, target, source):
         edge_model = node.get_edge_model()
         return edge_model.objects.filter(**{
