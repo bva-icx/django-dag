@@ -31,7 +31,7 @@ class BaseDagOrderController():
     # Note: These could become static members, as self dosen't seam to be
     #       used
 
-    def key_between(self, instance, other):
+    def key_between(self, instance, other, parent):
         """
         Return a key half way between this and other - assuming no other
         intermediate keys exist in the tree.
