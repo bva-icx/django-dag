@@ -91,14 +91,11 @@ class ProtoNode(BaseNode):
         return paths
 
     def get_roots(self):
-        """
-        Returns roots nodes, if any
-        """
         at =  self.get_ancestors_tree()
         roots = set()
         for a in at:
             roots.update(a._get_roots(at[a]))
-        return roots
+        return roots or set([self])
 
     def _get_roots(self, at):
         """
@@ -112,14 +109,11 @@ class ProtoNode(BaseNode):
         return roots
 
     def get_leaves(self):
-        """
-        Returns leaves nodes, if any
-        """
         dt =  self.get_descendants_tree()
         leaves = set()
         for d in dt:
             leaves.update(d._get_leaves(dt[d]))
-        return leaves
+        return leaves or set([self])
 
     def _get_leaves(self, dt):
         """
