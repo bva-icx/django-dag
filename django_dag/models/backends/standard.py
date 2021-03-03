@@ -126,7 +126,6 @@ class ProtoNode(BaseNode):
             leaves.update(d2._get_leaves(dt[d2]))
         return leaves
 
-
     def get_descendants_tree(self):
         """
         Returns a tree-like structure with progeny
