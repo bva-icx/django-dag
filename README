@@ -48,3 +48,4 @@ Breaking changes
 ................
    * The name of function Parents remove and parents is now a ManyRelatedManager the same
      as children.  change parents() to parents.all()
+   * get_roots, get_leaves now return self id node is an island

@@ -238,6 +238,9 @@ class BaseNode(object):
         """
         Find the root nodes in the dag attached to the currect node
 
+        If the dag is node is an island this will return a query set
+        containing just the source node (self).
+
         :rtype: QuerySet<<Node>>
         :return: The querySet of the root nodes
         """
@@ -246,6 +249,9 @@ class BaseNode(object):
     def get_leaves(self):
         """
         Find the leaf nodes in the dag attached to the currect node
+
+        If the dag is node is an island this will return a query set
+        containing just the source node (self).
 
         :rtype: QuerySet<<Node>>
         :return: The querySet of the leaf nodes
