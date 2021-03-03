@@ -8,9 +8,12 @@ Some ideas stolen from:
 from django.db import models
 from django.conf import settings
 from importlib import import_module
-
-
 from .order_control import BaseDagOrderController
+
+module_name = getattr(settings, 'DJANGO_DAG_BACKEND', "django_dag.models.backends.standard")
+backend = import_module(module_name)
+
+
 
 def edge_factory( node_model,
         child_to_field = "id",
@@ -130,8 +133,6 @@ def node_factory( edge_model,
     ):
     """Dag Node factory"""
 
-    module_name = getattr(settings, 'DJANGO_DAG_BACKEND', "django_dag.models.backends.standard")
-    backend = import_module(module_name)
     class Node(base_model, backend.ProtoNode):
         class Meta:
             abstract = True
