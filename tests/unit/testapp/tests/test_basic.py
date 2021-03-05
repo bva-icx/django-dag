@@ -320,8 +320,16 @@ class DagStructureTests(TestCase):
         self.assertEqual(self.nodes.p7.distance(self.nodes.p1), -2)
 
     def test_can_get_root_and_leaf_nodes_from_node(self,):
-        self.assertEqual([p.name for p in self.nodes.p1.get_leaves()], ['8', '10', '7'])
-        self.assertEqual([p.name for p in self.nodes.p8.get_roots()], ['1', '2', '4'])
+        with self.subTest("in tree"):
+            self.assertEqual(
+                sorted([p.name for p in self.nodes.p8.get_roots()], key=int),
+                ['1', '2', '4'])
+            self.assertEqual(
+                sorted([p.name for p in self.nodes.p1.get_leaves()], key=int),
+                ['7', '8', '10'])
+        with self.subTest("of an island"):
+            self.assertEqual([p.name for p in self.nodes.p11.get_roots()], ['11'])
+            self.assertEqual([p.name for p in self.nodes.p11.get_leaves()], ['11'])
 
     def test_node_know_if_it_a_root_or_leaf_node(self,):
         self.assertTrue(self.nodes.p1.is_root)
