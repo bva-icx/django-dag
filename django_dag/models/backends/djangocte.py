@@ -36,7 +36,7 @@ class ProtoNode(bProtoNode):
     def descendants(self):
         return [row for row in self._descendants_query()]
 
-    def descendant_pks(self):
+    def get_descendant_pks(self):
         return [
             row
             for row in self._descendants_query().values_list('pk', flat=True)
@@ -55,7 +55,7 @@ class ProtoNode(bProtoNode):
     def ancestors(self):
         return [row for row in self._ancestors_query()]
 
-    def ancestors_pks(self):
+    def get_ancestors_pks(self):
         return [
             row
             for row in self._ancestors_query().values_list('pk', flat=True)
