@@ -1,5 +1,10 @@
-from .base import BaseNode
+from django.db import models
 from django_dag.exceptions import NodeNotReachableException
+from .base import BaseNode
+
+
+ProtoNodeManager = models.Manager
+ProtoEdgeManager = models.Manager
 
 class ProtoNode(BaseNode):
     ################################################################

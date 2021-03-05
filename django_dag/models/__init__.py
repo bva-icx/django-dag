@@ -14,6 +14,22 @@ module_name = getattr(settings, 'DJANGO_DAG_BACKEND', "django_dag.models.backend
 backend = import_module(module_name)
 
 
+def edge_manager_factory(base_model, ordering=None, ):
+    _default_manager_class = None
+
+    _default_manager = getattr(base_model, '_default_manager', None)
+    if _default_manager:
+        _default_manager_class = base_model._default_manager.__class__
+
+    if _default_manager_class:
+        class MergerManager(_default_manager_class, backend.ProtoEdgeManager):
+            pass
+        _default_manager_class = MergerManager
+    else:
+        _default_manager_class = backend.ProtoEdgeManager
+
+    return _default_manager_class
+
 
 def edge_factory( node_model,
         child_to_field = "id",
@@ -36,6 +52,8 @@ def edge_factory( node_model,
     class Edge(base_model):
         class Meta:
             abstract = not concrete
+
+        objects = edge_manager_factory(base_model, ordering,)()
 
         parent = models.ForeignKey(
             node_model,
@@ -70,12 +88,20 @@ def edge_factory( node_model,
     return Edge
 
 
-def node_manager_factory(base_model, ordering=None):
-    _default_manager = getattr(base_model, '_default_manager', models.Manager)
-    if getattr(base_model, '_default_manager', None):
-        _default_manager = base_model._default_manager.__class__
+def node_manager_factory(base_model, ordering=None, ):
+    _default_manager_class = None
+    _default_manager = getattr(base_model, '_default_manager', None)
+    if _default_manager:
+        _default_manager_class = base_model._default_manager.__class__
 
-    class NodeManager(_default_manager):
+    if _default_manager_class:
+        class MergerManager(_default_manager_class, backend.ProtoEdgeManager):
+            pass
+        _default_manager_class = MergerManager
+    else:
+        _default_manager_class = backend.ProtoEdgeManager
+
+    class NodeManager(_default_manager_class):
         sequence_manager = ordering
 
         def ordered(self,):
@@ -137,7 +163,7 @@ def node_factory( edge_model,
         class Meta:
             abstract = True
 
-        objects = node_manager_factory(base_model, ordering)()
+        objects = node_manager_factory(base_model, ordering,)()
         children  = models.ManyToManyField(
                 'self',
                 blank = children_null,
