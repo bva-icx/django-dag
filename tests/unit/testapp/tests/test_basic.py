@@ -21,7 +21,6 @@ class DagTestCase(TestCase):
             self.assertEqual(BasicNode.objects.get(name="%s" % i).name, "%s" % i)
 
 
-    @unittest.expectedFailure
     def test_deep_dag(self):
         """
         Create a deep graph and check that graph operations run in a

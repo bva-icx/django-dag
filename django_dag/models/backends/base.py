@@ -5,24 +5,6 @@ from django_dag.exceptions import NodeNotReachableException
 
 from deprecation import deprecated
 
-def filter_order(queryset, field_names, values):
-    """
-    QuerySet filter
-    Filter queryset where field_name in values, order results in
-    the same order as values
-    """
-    if not isinstance(field_names, list):
-        field_names = [field_names]
-    case = []
-    for pos, value in enumerate(values):
-        when_condition = {field_names[0]: value, 'then': pos}
-        case.append(When(**when_condition))
-    order_by = Case(*case)
-    filter_condition = {field_name + '__in': values
-                        for field_name in field_names}
-    return queryset.filter(**filter_condition).order_by(order_by)
-
-
 class BaseNode(object):
     """
     Main node abstract model
@@ -43,7 +25,7 @@ class BaseNode(object):
         if parent == child:
             raise ValidationError('Self links are not allowed.')
 
-        if child.pk in parent.ancestor_pks():
+        if child.pk in parent.get_ancestor_pks():
             raise ValidationError('The object is an ancestor.')
 
     @classmethod
@@ -67,29 +49,6 @@ class BaseNode(object):
         :param linkname: The name of the field that links the nodes
         """
         return getattr(cls._meta.model, linkname).rel.through
-
-    def filter_order_node_ids(self, pk_list, respect_manager=True):
-        if respect_manager:
-            return filter_order(self._meta.default_manager, 'pk', pk_list)
-        return filter_order(self._meta.base_manager, 'pk', pk_list)
-
-    def filter_order_edge_ids(self, pk_list, respect_manager=True):
-        model = self.get_edge_model()
-        if respect_manager:
-            return filter_order(model._meta.default_manager, 'pk', pk_list)
-        return filter_order(model._meta.base_manager, 'pk', pk_list)
-
-    @property
-    def ancestors(self):
-        return self.filter_order_node_ids(self.ancestor_pks())
-
-    @property
-    def descendants(self):
-        return self.filter_order_node_ids(self.descendant_pks())
-
-    @property
-    def clan(self):
-        return self.filter_order_node_ids(self.clan_pks())
 
     @property
     def is_root(self):
@@ -171,16 +130,28 @@ class BaseNode(object):
             pass
         return - len(self.get_paths(target, downwards=False)[0])
 
-    def clan_pks(self):
+    @property
+    def clan(self):
+        return self.ancestors + [self, ] + self.descendants
+
+    @property
+    def ancestors(self):
+        raise NotImplementedError()
+
+    @property
+    def descendants(self):
+        raise NotImplementedError()
+
+    def get_clan_pks(self):
         """
         Get a list of all the pks in the clan
 
         :rtype: list[ int, ... ]
         :return: list of pk
         """
-        return self.ancestor_pks() + [self.pk, ] + self.descendant_pks()
+        return self.get_ancestor_pks() + [self.pk, ] + self.get_descendant_pks()
 
-    def descendant_pks(self):
+    def get_descendant_pks(self):
         """
         Get a list of the node pk which are descendant
 
@@ -189,7 +160,7 @@ class BaseNode(object):
         """
         raise NotImplementedError()
 
-    def ancestor_pks(self):
+    def get_ancestor_pks(self):
         """
         Get a list of the node pk which are ancestor
 

@@ -4,36 +4,50 @@ from django_dag.exceptions import NodeNotReachableException
 class ProtoNode(BaseNode):
     ################################################################
     # Public API
-    def descendant_pks(self):
-            return list(self._descendant_pks())
+    @property
+    def descendants(self):
+            return list(self._get_descendant())
 
-    def _descendant_pks(self, cached_results=None):
+    def get_descendant_pks(self):
+            return list(self._get_descendant(node_to_cache_attr=lambda x:x.pk))
+
+    def _get_descendant(self, cached_results=None, node_to_cache_attr=lambda x:x):
         if cached_results is None:
             cached_results = dict()
-        if self.pk in cached_results.keys():
-            return cached_results[self.pk]
+        if node_to_cache_attr(self) in cached_results.keys():
+            return cached_results[node_to_cache_attr(self)]
         else:
             res = set()
             for f in self.children.all():
-                res.add(f.pk)
-                res.update(f._descendant_pks(cached_results=cached_results))
-            cached_results[self.pk] = res
+                res.add(node_to_cache_attr(f))
+                res.update(f._get_descendant(
+                    cached_results=cached_results,
+                    node_to_cache_attr=node_to_cache_attr
+                    ))
+            cached_results[node_to_cache_attr(self)] = res
             return res
 
-    def ancestor_pks(self):
-        return list(self._ancestor_pks())
+    @property
+    def ancestors(self):
+        return list(self._get_ancestor())
 
-    def _ancestor_pks(self, cached_results=None):
+    def get_ancestor_pks(self):
+        return list(self._get_ancestor(node_to_cache_attr=lambda x:x.pk))
+
+    def _get_ancestor(self, cached_results=None, node_to_cache_attr=lambda x:x):
         if cached_results is None:
             cached_results = dict()
-        if self in cached_results.keys():
-            return cached_results[self.pk]
+        if node_to_cache_attr(self) in cached_results.keys():
+            return cached_results[node_to_cache_attr(self)]
         else:
             res = set()
             for f in self.parents.all():
-                res.add(f.pk)
-                res.update(f._ancestor_pks(cached_results=cached_results))
-            cached_results[self.pk] = res
+                res.add(node_to_cache_attr(f))
+                res.update(f._get_ancestor(
+                    cached_results=cached_results,
+                    node_to_cache_attr=node_to_cache_attr
+                ))
+            cached_results[node_to_cache_attr(self)] = res
             return res
 
     def get_paths(self, target, use_edges=False, downwards=None):
@@ -61,7 +75,7 @@ class ProtoNode(BaseNode):
             else:
                 return [[target if downwards else self],]
 
-        if target.pk in self.descendant_pks():
+        if target.pk in self.get_descendant_pks():
             paths = []
             path_length = 0
             childItems = self.get_edge_model().objects.filter(
