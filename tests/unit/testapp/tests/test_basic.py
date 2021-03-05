@@ -397,6 +397,23 @@ class DagStructureTests(TestCase):
             sorted([p.name for p in self.nodes.p1.descendants], key=int),
             ['5', '6', '7', '8', '9', '10'])
 
+    def test_can_find_ancestors_pks(self):
+        self.assertEqual(
+            sorted(self.nodes.p6.get_ancestor_pks()),
+            [self.nodes.p1.pk, self.nodes.p2.pk, self.nodes.p4.pk])
+
+    def test_can_find_descendants_pks(self):
+        self.assertEqual(
+            sorted(self.nodes.p1.get_descendant_pks()),
+            [
+                self.nodes.p5.pk,
+                self.nodes.p6.pk,
+                self.nodes.p7.pk,
+                self.nodes.p8.pk,
+                self.nodes.p9.pk,
+                self.nodes.p10.pk
+            ])
+
     @unittest.skip('we need to define the contract')
     def test_ordering_of_descendant_nodes(self):
         # Note: What ordering promises fo we make?
@@ -414,6 +431,24 @@ class DagStructureTests(TestCase):
         self.assertEqual(
             sorted([p.name for p in self.nodes.p6.clan], key=int),
             ['1', '2', '4', '6', '7', '8', '9', '10'])
+
+    def test_can_find_clan_pks(self):
+        self.assertEqual(
+            sorted(self.nodes.p5.get_clan_pks()),
+            [self.nodes.p1.pk, self.nodes.p5.pk, self.nodes.p7.pk])
+        self.assertEqual(
+            sorted(self.nodes.p6.get_clan_pks()),
+            [
+                self.nodes.p1.pk,
+                self.nodes.p2.pk,
+                self.nodes.p4.pk,
+                self.nodes.p6.pk,
+                self.nodes.p7.pk,
+                self.nodes.p8.pk,
+                self.nodes.p9.pk,
+                self.nodes.p10.pk
+            ])
+
 
     def test_dag_tree_render(self):
         # Testing the view
