@@ -215,6 +215,11 @@ class DagStructureTests(TestCase):
         self.build_structure()
 
     def build_structure(self,):
+        for a in range(0,20):
+            #shift id of edge:
+            self.nodes.p1.add_child(self.nodes.p2)
+            self.nodes.p1.remove_child(self.nodes.p2)
+
         self.nodes.p1.add_child(self.nodes.p5)
         self.nodes.p5.add_child(self.nodes.p7)
         self.nodes.p1.add_child(self.nodes.p6)
@@ -285,6 +290,7 @@ class DagStructureTests(TestCase):
             )
 
     def test_path_can_return_edges(self,):
+        # Both up and down should be the same
         self.assertEqual(
             [
                 (edge.parent.name, edge.child.name)
@@ -299,7 +305,6 @@ class DagStructureTests(TestCase):
             ],
             [ ('4','6'), ('6','9'), ('9','10') ]
             )
-
 
     def test_path_between_nodes_upwards(self,):
         self.assertEqual(
