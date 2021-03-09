@@ -272,6 +272,14 @@ class BaseNode(object):
             descendant, self, after, **kwargs)
 
     ################################################################
+    #  Do we want these
+    def descendants_tree(self):
+        raise NotImplementedError()
+
+    def ancestors_tree(self):
+        raise NotImplementedError()
+
+    ################################################################
     # Legacy functions
     @deprecated()
     def node_set(self):

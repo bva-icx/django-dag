@@ -294,3 +294,21 @@ class ProtoNode(bProtoNode):
                 )
             return result_cte_query
         return make_list_items_cte
+
+    def get_descendants_tree(self):
+        """
+        Returns a tree-like structure with progeny
+        """
+        tree = {}
+        for f in self.children.all():
+            tree[f] = f.get_descendants_tree()
+        return tree
+
+    def get_ancestors_tree(self):
+        """
+        Returns a tree-like structure with ancestors
+        """
+        tree = {}
+        for f in self.parents.all():
+            tree[f] = f.get_ancestors_tree()
+        return tree
