@@ -33,13 +33,19 @@ class DagNodeIntSorter(BaseDagNodeOrderController):
         """
         Provide the next key in the sequence
         """
-        return instance.sequence + int(100 - instance.sequence) /2
+        return instance.sequence + (100 - instance.sequence) /2
 
     def first_key(self,):
         """
         Provide the first key in the sequence
         """
         return 50
+
+    def prev_key(self, instance, parent):
+        """
+        Provide the first key in the sequence
+        """
+        return instance.sequence - instance.sequence / 2
 
 
 class DagEdgeIntSorter(BaseDagEdgeOrderController):
@@ -135,10 +141,20 @@ class DagEdgeIntSorter(BaseDagEdgeOrderController):
             parent=parent,
             child=instance
         ).values_list(self.sequence_field_name, flat=True)
-        return edges[0] + int(100 - edges[0]) /2
+        return edges[0] + (100 - edges[0]) /2
 
     def first_key(self,):
         """
         Provide the first key in the sequence
         """
         return 50
+
+    def prev_key(self, instance, parent):
+        """
+        Provide the first key in the sequence
+        """
+        edges = instance.children.through.objects.filter(
+            parent=parent,
+            child=instance
+        ).values_list(self.sequence_field_name, flat=True)
+        return edges[0] - edges[0] /2
