@@ -70,7 +70,7 @@ class ProtoNode(bProtoNode):
     def ancestors(self):
         return [row for row in self._ancestors_query()]
 
-    def get_ancestors_pks(self):
+    def get_ancestor_pks(self):
         return [
             row
             for row in self._ancestors_query().values_list('pk', flat=True)
