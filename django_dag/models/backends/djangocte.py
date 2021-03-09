@@ -21,13 +21,13 @@ from django.db.models import Exists, OuterRef, Subquery
 from django.db.models import Max
 from django_dag.exceptions import NodeNotReachableException
 from django_cte import CTEManager, With
-from .standard import ProtoNode as bProtoNode
+from .base import BaseNode
 
 ProtoNodeManager = CTEManager
 ProtoEdgeManager = CTEManager
 
 
-class ProtoNode(bProtoNode):
+class ProtoNode(BaseNode):
     def make_related_cte_fn(self, remote_name, local_name):
         def make_related_cte(cte):
             edge_model = self.get_edge_model()
