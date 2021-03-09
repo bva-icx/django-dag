@@ -2,15 +2,13 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.db.models import OuterRef, Subquery
-from django.db.models import Count, F, Value
-from django.core.exceptions import ObjectDoesNotExist
-from django_dag.models import node_factory, edge_factory
-from django_dag.models.order_control import BaseDagOrderController
+from django_dag.models.order_control import (
+    BaseDagNodeOrderController,
+    BaseDagEdgeOrderController
+)
 
-
-
-class DagNodeIntSorter(BaseDagOrderController):
-
+class DagNodeIntSorter(BaseDagNodeOrderController):
+    """Simple node sorter based on Broken Integer implementation"""
     @classmethod
     def get_node_sequence_field(cls, ):
         """
@@ -23,54 +21,6 @@ class DagNodeIntSorter(BaseDagOrderController):
                 db_index=True,
                 default=0,
             )
-
-    @classmethod
-    def get_edge_sequence_field(cls, ):
-        """
-        Returns a single field to be used to support ordering.
-        Should the controller require more fields this can be a primary key
-        to another model
-        """
-        return None
-
-    def get_relatedsort_query_component(self, model, targetname, sourcename):
-        """
-        Builds a query component that can be used for sorting a children of
-        a dag Node.
-
-        :return: django F() expressions
-        """
-        return F(self.sequence_field_name)
-
-    def get_sorted_edge_queryset(self, node, target, source):
-        edge_model = node.get_edge_model()
-        return edge_model.objects.filter(**{
-                source: node
-            }).select_related(target).order_by(
-                "%s__%s"%(target, self.sequence_field_name,)
-            )
-
-    def get_next_sibling(self, basenode, parent_node):
-        edge_model = basenode.get_edge_model()
-        sibling_node_edge = edge_model.objects.filter(
-            parent=parent_node,
-        ).filter(
-            child__sequence__gt = basenode.sequence
-        ).order_by(
-            "child__%s"%(self.sequence_field_name,)
-        ).select_related('child').first()
-        return sibling_node_edge.child if sibling_node_edge else None
-
-    def get_prev_sibling(self, basenode, parent_node):
-        edge_model = basenode.get_edge_model()
-        sibling_node_edge = edge_model.objects.filter(
-            parent=parent_node,
-        ).filter(
-            child__sequence__lt = basenode.sequence
-        ).order_by(
-            "-child__%s"%(self.sequence_field_name,)
-        ).select_related('child').first()
-        return sibling_node_edge.child if sibling_node_edge else None
 
     def key_between(self, instance, other, parent):
         """
@@ -92,19 +42,8 @@ class DagNodeIntSorter(BaseDagOrderController):
         return 50
 
 
-class DagEdgeIntSorter(BaseDagOrderController):
-    """
-    Simple sorter based on CharSortKey
-    """
-
-    @classmethod
-    def get_node_sequence_field(cls, ):
-        """
-        Returns a single field to be used to support ordering.
-        Should the controller require more fields this can be a primary key
-        to another model
-        """
-        return None
+class DagEdgeIntSorter(BaseDagEdgeOrderController):
+    """Simple edge sorter based on Broken Integer implementation"""
 
     @classmethod
     def get_edge_sequence_field(cls, ):
