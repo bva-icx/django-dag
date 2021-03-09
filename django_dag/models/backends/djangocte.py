@@ -85,6 +85,58 @@ class ProtoNode(bProtoNode):
             .with_cte(cte).order_by('id', 'depth') \
             .annotate(depth=Max(cte.col.depth))
 
+    def make_root_leaf_cte_fn(self, remote_name, local_name):
+        def make_related_cte(cte):
+            edge_model = self.get_edge_model()
+            basic_cte_query = edge_model.objects.filter(**{local_name:self.pk}) \
+                .values(
+                    rid=F(remote_name),
+                    lid=F(local_name),
+                ) \
+                .union(
+                    cte.join(edge_model, **{local_name:cte.col.rid}) \
+                        .values(
+                            rid=F(remote_name),
+                            lid=F(local_name),
+                        ).distinct(),
+                        all=False,
+                )
+            return basic_cte_query
+        return make_related_cte
+
+    def get_roots(self):
+        return self._get_source_sink_node('parent_id', 'child_id')
+
+    def get_leaves(self):
+        return self._get_source_sink_node('child_id', 'parent_id')
+
+    def _get_source_sink_node(self,remote_name, local_name):
+        edge_model = self.get_edge_model()
+        node_model = self.get_node_model()
+
+        cte = With.recursive(self.make_root_leaf_cte_fn(
+            remote_name=remote_name, local_name=local_name
+        ))
+        datarows = cte.join(node_model, pk=cte.col.rid) \
+            .with_cte(cte) \
+            .annotate(
+                linked = Exists(
+                    edge_model.objects.filter(**{local_name: OuterRef('pk')})
+                )
+            ) \
+            .filter(linked=False) \
+            .union(
+                node_model.objects.filter(pk=self.pk) \
+                .annotate(
+                    linked = Exists(
+                        edge_model.objects.filter(**{local_name: OuterRef('pk')})
+                    )
+                ) \
+                .filter(linked=False)
+            ) \
+            .order_by('id')
+        return datarows
+
     def make_path_cte_fn(self, field_name, source, target):
         def make_path_cte(paths):
             edge_model = self.get_edge_model()
