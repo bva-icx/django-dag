@@ -60,7 +60,7 @@ def edge_factory( node_model,
         concrete = True,
         base_model = models.Model,
         manager = None,
-        queryset = None,
+        queryset = BaseEdgeQuerySet,
     ):
     """
     Dag Edge factory
@@ -173,7 +173,7 @@ def node_factory( edge_model,
         field = models.ManyToManyField,
         ordering = False,
         manager = None,
-        queryset = None,
+        queryset = BaseNodeQuerySet,
     ):
     """Dag Node factory"""
 
