@@ -35,7 +35,7 @@ class DagNodeIntSorter(BaseDagNodeOrderController):
         """
         return instance.sequence + (100 - instance.sequence) /2
 
-    def first_key(self,):
+    def initial_key(self,):
         """
         Provide the first key in the sequence
         """
@@ -143,7 +143,7 @@ class DagEdgeIntSorter(BaseDagEdgeOrderController):
         ).values_list(self.sequence_field_name, flat=True)
         return edges[0] + (100 - edges[0]) /2
 
-    def first_key(self,):
+    def initial_key(self,):
         """
         Provide the first key in the sequence
         """

@@ -63,7 +63,7 @@ class BaseDagOrderController():
         """
         raise NotImplementedError
 
-    def first_key(self):
+    def initial_key(self):
         """
         Provide the initial /first key in the sequence
 
@@ -184,7 +184,7 @@ class BaseDagOrderController():
         :return: return result from edge link save
         """
         if after is None:
-            sequence = self.first_key()
+            sequence = self.initial_key()
         else:
             before = after.get_prev_sibling(parent_node)
             if before:
@@ -206,7 +206,7 @@ class BaseDagOrderController():
         :return: return result from edge link save
         """
         if before is None:
-            sequence = self.first_key()
+            sequence = self.initial_key()
         else:
             after = before.get_next_sibling(parent_node)
             if after:
@@ -284,7 +284,7 @@ class BaseDagOrderController():
         """
         sequence = None
         if destination_sibling is None:
-            sequence = self.first_key()
+            sequence = self.initial_key()
         else:
             other_sibling = None
             if position == Position.BEFORE:
