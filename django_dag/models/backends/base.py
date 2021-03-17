@@ -271,6 +271,77 @@ class BaseNode(object):
         return self.sequence_manager.insert_child_after(
             descendant, self, after, **kwargs)
 
+    def insert_child(self, descendant, position, **kwargs):
+        return self.sequence_manager.insert_child_after(
+            descendant, self, position, **kwargs)
+
+    def move_child_before(self, descendant, before, **kwargs):
+        """
+        Move the edge link sequence so the child come before node
+
+        Note: This does not change the parent or child just modify the
+        relative position of the child to its siblings from this parent.
+
+        :param descendant: The child node to add
+        :param before: The child node to add
+        :return: return result from edge link save
+        :raises: InvalidNodeMove
+        """
+        return self.sequence_manager.move_child_before(
+            descendant, self, before, **kwargs)
+
+    def move_child_after(self, descendant, after, **kwargs):
+        """
+        Move the edge link sequence so the child come before node
+
+        Note: This does not change the parent or child just modify the
+        relative position of the child to its siblings from this parent.
+
+        :param descendant: The child node to add
+        :param after: The child node to add
+        :return: return result from edge link save
+        :raises: InvalidNodeMove
+        """
+        return self.sequence_manager.move_child_after(
+            descendant, self, after, **kwargs)
+
+    def move_node(self, origin_parent, destination_parent,
+            destination_sibling=None, position=None):
+        """
+        Generic node restructure. Moves this Node preserving the edge object.
+
+        This allows a node to be moved whilst the edge link any any supplimentry
+        data on the Edge is preserved,
+        If there is no destination sibling then the node is added as a child
+        using the default sequence position
+
+        :NOTE The params destination_sibling, position are only supported on
+            ordered dags
+
+        :param origin_parent: The nodes current parent
+        :param destination_parent: The node final parent
+        :param destination_sibling: The node final sibing or None
+        :param position: `class:Position` or None
+        """
+        edge = origin_parent.get_edge_model().objects \
+            .filter(
+                parent_id = origin_parent.pk,
+                child_id = self.pk
+            ).first()
+        if edge is None:
+            raise exceptions.InvalidNodeMode()
+        destination_parent.circular_checker(destination_parent, self)
+
+        if self.sequence_manager:
+            return self.sequence_manager.move_node(
+                self, origin_parent, destination_parent,
+                destination_sibling=destination_sibling,
+                position=position,
+            )
+
+        edge.parent_id = destination_parent.pk
+        return edge.save()
+
     ################################################################
     #  Do we want these
     def descendants_tree(self):

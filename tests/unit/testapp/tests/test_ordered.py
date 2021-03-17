@@ -71,7 +71,6 @@ class DagOrderindBasicTests(TestCase):
             ),
             [(1, 5, 54), (1, 6, 8), (1, 7, 4), (2, 5, 1), (2, 6, 7), (2, 7, 5)])
 
-    @unittest.expectedFailure #  ('we dont have prev key api')
     def test_can_use_node_insert_before_at_start_uses_key_next(self):
         self.nodes_eo.p1.add_child(self.nodes_eo.p5, sequence=12)
         self.nodes_eo.p1.add_child(self.nodes_eo.p6, sequence=8)
@@ -227,6 +226,25 @@ class EdgeSortedDagRelationshipTests(TestCase):
         self.assertEqual(
             self.nodes.p5.get_prev_sibling(self.nodes.p2), None)
 
+    @unittest.skip('todo')
+    def test_cannot_move_a_node_between_parents_causing_circular_ref():
+        pass
+
+    @unittest.skip('todo')
+    def test_can_move_a_node_between_parents():
+        pass
+        #first, last
+
+    @unittest.skip('todo')
+    def test_can_move_a_node_relative_to_a_sibling_same_parent():
+        pass
+        #before, after, last, fist
+
+    @unittest.skip('todo')
+    def test_can_move_a_node_relative_to_a_sibling_difernt_parent():
+        pass
+        #before, after, last, fist
+
 
 class NodeSortedDagRelationshipTests(TestCase):
     def setUp(self):
@@ -333,3 +351,22 @@ class NodeSortedDagRelationshipTests(TestCase):
             self.nodes.p6)
         self.assertEqual(
             self.nodes.p6.get_prev_sibling(self.nodes.p2), None)
+
+    @unittest.skip('todo')
+    def test_cannot_move_a_node_between_parents_causing_circular_ref():
+        pass
+
+    @unittest.skip('todo')
+    def test_can_move_a_node_between_parents():
+        pass
+        #first, last
+
+    @unittest.skip('todo')
+    def test_can_move_a_node_relative_to_a_sibling_same_parent():
+        pass
+        #before, after, last, fist
+
+    @unittest.skip('todo')
+    def test_can_move_a_node_relative_to_a_sibling_difernt_parent():
+        pass
+        #before, after, last, fist

@@ -1,6 +1,16 @@
+from enum import Enum, auto
+
 from django.db import models
 from django.db.models import OuterRef, Subquery, F, Min
+from django.db import transaction
 from django.core.exceptions import ObjectDoesNotExist
+from django_dag import exceptions
+
+class Position(Enum):
+    FIRST = auto()
+    LAST = auto()
+    BEFORE = auto()
+    AFTER = auto()
 
 class BaseDagOrderController():
     """
@@ -170,15 +180,17 @@ class BaseDagOrderController():
         Adds a node to the current node as a child directly before a sibling.
 
         :param descendant: The child node to add
-        :param after: The child node to add
+        :param after: The child node to add or None
         :return: return result from edge link save
         """
-        before = after.get_prev_sibling(parent_node)
-        if before:
-            sequence =self.key_between(after, before, parent_node)
+        if after is None:
+            sequence = self.first_key()
         else:
-            assert False, "We have no prev!"
-            sequence = self.next_key(after, parent_node)
+            before = after.get_prev_sibling(parent_node)
+            if before:
+                sequence =self.key_between(after, before, parent_node)
+            else:
+                sequence = self.prev_key(after, parent_node)
 
         kwargs.update({
             self.sequence_field_name: sequence
@@ -190,22 +202,124 @@ class BaseDagOrderController():
         Adds a node to the current node as a child directly after a sibling.
     
         :param descendant: The child node to add
-        :param before: The child node to add
+        :param after: The child node to add or None
         :return: return result from edge link save
         """
-        after = before.get_next_sibling(parent_node)
-        if after:
-            sequence =self.key_between(after, before, parent_node)
+        if before is None:
+            sequence = self.first_key()
         else:
-            sequence = self.next_key(before, parent_node)
+            after = before.get_next_sibling(parent_node)
+            if after:
+                sequence =self.key_between(after, before, parent_node)
+            else:
+                sequence = self.next_key(before, parent_node)
+
         kwargs.update({
             self.sequence_field_name: sequence
         })
         return parent_node.add_child( descendant, **kwargs)
 
-    ####################################################################
-    # These need mapping onto the edge object
-    # TODO
+    def move_child_before(self, descendant, parent_node, before, **kwargs):
+        """
+        Move the edge link sequence so the child come before node
+
+        Note: This does not change the parent or child just modify the
+        relative position of the child to its siblings from this parent.
+
+        :param descendant: The child node to add
+        :param before: The child node to add
+        :return: return result from edge link save
+        :raises: InvalidNodeMove
+        """
+        if parent_node.children.filter(id__in = [before.pk, descendant.pk]).count() != 2:
+            raise exceptions.InvalidNodeMove()
+
+    def move_child_after(self, descendant, parent_node, after, **kwargs):
+        """
+        Move the edge link sequence so the child come before node
+
+        Note: This does not change the parent or child just modify the
+        relative position of the child to its siblings from this parent.
+
+        :param descendant: The child node to add
+        :param after: The child node to add
+        :return: return result from edge link save
+        :raises: InvalidNodeMove
+        """
+        # Check both are siblings of parent
+        if parent_node.children.filter(id__in = [after.pk, descendant.pk]).count() != 2:
+            raise exceptions.InvalidNodeMove()
+
+    def insert_child(self, descendant, parent_node, position, **kwargs):
+        """
+        Adds a node to the current node as a child directly after a sibling.
+
+        :param descendant: The child node to add
+        :return: return result from edge link save
+        """
+        if position == Position.FIRST:
+            insert_before = parent_node.get_first_child()
+            return self.insert_child_before(descendant, parent_node, insert_before)
+        elif position == Position.Last:
+            insert_after = parent_node.get_last_child()
+            return self.insert_child_before(descendant, parent_node, insert_after)
+        else:
+            raise exceptions.InvalidNodeInsert()
+
+    def move_node(self, descendant, origin_parent, destination_parent,
+            destination_sibling, position, **kwargs):
+        """
+        Generic node restructure. Moves a Node preserving the edge object.
+
+        This allows a node to be moved whilst the edge link any any supplimentry
+        data on the Edge is preserved,
+        If there is no destination sibling then the node is added as a child
+        using the default sequence position
+
+        :param descendant: The node to move
+        :param origin_parent: The nodes current parent
+        :param destination_parent: The node final parent
+        :param destination_sibling: The node final sibing or None
+        :param position: `class:Position` or None
+        """
+        sequence = None
+        if destination_sibling is None:
+            sequence = self.first_key()
+        else:
+            other_sibling = None
+            if position == Position.BEFORE:
+                other_sibling = self.get_prev_sibling(
+                    destination_sibling, destination_parent)
+                if other_sibling:
+                    sequence = self.key_between(other_sibling, destination_sibling,
+                        destination_parent)
+            if position == Position.FIRST or (
+                position == Position.BEFORE and not sequence
+            ):
+                other_sibling = self.get_first_sibling(
+                    destination_sibling, destination_parent)
+                if other_sibling:
+                    sequence = self.prev_key(other_sibling, destination_parent)
+
+            if position == Position.AFTER:
+                other_sibling = self.get_next_sibling(
+                    destination_sibling, destination_parent)
+                if other_sibling:
+                    sequence = self.key_between(destination_sibling, other_sibling,
+                        destination_parent)
+            if position == Position.LAST or (
+                position is None ) or (
+                position == Position.AFTER and not sequence
+            ):
+                other_sibling = self.get_last_sibling(
+                    destination_sibling, destination_parent)
+                if other_sibling:
+                    sequence = self.next_key(other_sibling, destination_parent)
+
+        assert sequence is not None
+        kwargs.update({ self.sequence_field_name: sequence })
+        return self._move_node(descendant, origin_parent, destination_parent,
+            **kwargs)
 
 
 class BaseDagNodeOrderController(BaseDagOrderController):
@@ -268,6 +382,18 @@ class BaseDagNodeOrderController(BaseDagOrderController):
             "-child__%s"%(self.sequence_field_name,)
         ).select_related('child').first()
         return sibling_node_edge.child if sibling_node_edge else None
+
+    def _move_node(self, descendant, origin_parent, destination_parent, **kwargs):
+        edge = origin_parent.get_edge_model().objects \
+            .filter(
+                parent_id = origin_parent.pk,
+                child_id = self.pk
+            ).first()
+        with transaction.atomic():
+            setattr(descendant, self.sequence_field_name, kwargs.pop(self.sequence_field_name))
+            edge.parent_id = destination_parent.pk
+            node.save()
+            return edge.save()
 
 
 class BaseDagEdgeOrderController(BaseDagOrderController):
@@ -345,3 +471,14 @@ class BaseDagEdgeOrderController(BaseDagOrderController):
         except ObjectDoesNotExist:
             return None
         return sibling_node_edge.child if sibling_node_edge else None
+
+    def _move_node(self, descendant, origin_parent, destination_parent, **kwargs):
+        edge = origin_parent.get_edge_model().objects \
+            .filter(
+                parent_id = origin_parent.pk,
+                child_id = descendant.pk
+            ).first()
+        with transaction.atomic():
+            setattr(edge, self.sequence_field_name, kwargs.pop(self.sequence_field_name))
+            edge.parent_id = destination_parent.pk
+            return edge.save()

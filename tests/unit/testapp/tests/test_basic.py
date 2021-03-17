@@ -454,3 +454,11 @@ class DagStructureTests(TestCase):
         # Testing the view
         response = render_to_response('tree.html', { 'dag_list': BasicNode.objects.all()})
         self.assertEqual(response.content.decode('utf-8'), expected_tree_output)
+
+    @unittest.skip('todo')
+    def test_can_move_a_node_between_parents():
+        pass
+
+    @unittest.skip('todo')
+    def test_cannot_move_a_node_between_parents_causing_circular_ref():
+        pass
