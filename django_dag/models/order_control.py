@@ -43,12 +43,34 @@ class BaseDagOrderController():
     def next_key(self, instance, parent):
         """
         Provide the next key in the sequence
+
+        If the instance to not connected to parent this wil raise
+        NodeNotReachableException
+
+        :return: value to store in the sequence_field
+        :raise: NodeNotReachableException
+
         """
         raise NotImplementedError
 
     def first_key(self):
         """
-        Provide the first key in the sequence
+        Provide the initial /first key in the sequence
+
+        Note: this is not the start of the key space, but the first key to be
+        used
+        """
+        raise NotImplementedError
+
+    def prev_key(self, instance, parent):
+        """
+        Provide the prev key in the sequence
+
+        If the instance to not connected to parent this wil raise
+        NodeNotReachableException
+
+        :return: value to store in the sequence_field
+        :raise: NodeNotReachableException
         """
         raise NotImplementedError
 
