@@ -8,20 +8,6 @@ from .ordersort import DagEdgeIntSorter, DagNodeIntSorter
 # A Dag in which the children of a node are ordered in respect each
 # other. eg the order is attached to the node edge
 
-class EdgeOrderedNode(node_factory(
-        'OrderedEdge',
-        ordering = DagEdgeIntSorter(),
-    )):
-    """
-    Simple Test node for Edge Save Support
-    """
-    name = CharField(max_length=32)
-
-    def __str__(self):
-        return '# %s' % self.name
-
-    class Meta:
-        app_label = 'testapp'
 
 class OrderedEdge(edge_factory(
         'EdgeOrderedNode',
@@ -45,6 +31,21 @@ class OrderedEdge(edge_factory(
         # return the edge used to link the parent to the child
         super().save(*args, **kwargs)
         return self
+
+class EdgeOrderedNode(node_factory(
+        OrderedEdge,
+        ordering = DagEdgeIntSorter(),
+    )):
+    """
+    Simple Test node for Edge Save Support
+    """
+    name = CharField(max_length=32)
+
+    def __str__(self):
+        return '# %s' % self.name
+
+    class Meta:
+        app_label = 'testapp'
 
 
 ################################################################
