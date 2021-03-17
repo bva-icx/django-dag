@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.models import OuterRef, Subquery, F
+from django.db.models import OuterRef, Subquery, F, Min
 from django.core.exceptions import ObjectDoesNotExist
 
 class BaseDagOrderController():
@@ -54,7 +54,28 @@ class BaseDagOrderController():
 
     ####################################################################
     # Queries related to a node
-    def get_relatedsort_query_component(self, model, target, source):
+    def get_node_rel_sort_query_component(self, model, target, source):
+        """
+        Builds a query component that can be used for sorting a children of
+        a dag Node.
+
+        If the model is a instance of a DAG node the children should be
+        so sorted in relation to the instance, if the model is a class then
+        all result we be the indeterminate although in the reference implementation
+        of edgeordering it is the first sequence. The precise details are
+        implementation specific to the the concrete sequence_manager
+        The returned query should be relative to the Node model
+
+        :param model: A Node model or model instance
+        :param target: the name of the field linking to the target
+        :param source: the name of the field linking to the source node
+
+        :return: A componet to be used in a further query
+            F, Subquery etc. which will result in a value for the node sequence
+        """
+        raise NotImplementedError
+
+    def get_edge_rel_sort_query_component(self, model, target, source):
         """
         Builds a query component that can be used for sorting a children of
         a dag Node.
@@ -64,6 +85,7 @@ class BaseDagOrderController():
         all result we be the indeterminate although in the reference implementation
         of edgeordering it is the first sequence. The precise details are
         implementation specific to the the concrete sequence_manager 
+        The returned query should be relative to the NodeEdge model
 
         :param model: A Node model or model instance
         :param target: the name of the field linking to the target
@@ -174,21 +196,33 @@ class BaseDagNodeOrderController(BaseDagOrderController):
         """
         return None
 
-    def get_relatedsort_query_component(self, model, targetname, sourcename):
+    def get_node_rel_sort_query_component(self, model, targetname, sourcename):
         """
         Builds a query component that can be used for sorting a children of
         a dag Node.
+        The returned query is relative to the Node
 
         :return: django F() expressions
         """
         return F(self.sequence_field_name)
 
+    def get_edge_rel_sort_query_component(self, model, targetname, sourcename):
+        """
+        Builds a query component that can be used for sorting a children of
+        a dag Node.
+        The returned query is relative to the Edge
+
+        :param model: A Node model or model instance
+        :return: Subquery etc. which will result in a value for the node sequence
+        """
+        return F("{}__{}".format(targetname,self.sequence_field_name))
+
     def get_sorted_edge_queryset(self, node, target, source):
         edge_model = node.get_edge_model()
-        return edge_model.objects.filter(**{
-                source: node
-            }).select_related(target).order_by(
-                "%s__%s"%(target, self.sequence_field_name,)
+        return edge_model.objects.filter(**{source: node}) \
+            .select_related(target) \
+            .order_by(
+                "{}__{}".format(target, self.sequence_field_name)
             )
 
     def get_next_sibling(self, basenode, parent_node):
@@ -214,7 +248,6 @@ class BaseDagNodeOrderController(BaseDagOrderController):
         return sibling_node_edge.child if sibling_node_edge else None
 
 
-
 class BaseDagEdgeOrderController(BaseDagOrderController):
     @classmethod
     def get_node_sequence_field(cls, ):
@@ -224,21 +257,38 @@ class BaseDagEdgeOrderController(BaseDagOrderController):
         to another model
         """
         return None
-    def get_relatedsort_query_component(self, model, targetname, sourcename):
+
+    def get_node_rel_sort_query_component(self, model, targetname, sourcename):
         """
         Builds a query component that can be used for sorting a children of
         a dag Node.
+        The returned query is relative  to the Node
 
         :param model: A Node model or model instance
         :return: Subquery etc. which will result in a value for the node sequence
         """
+        sort_field_name = '_min_{}'.format(self.sequence_field_name)
+
         sequence = model.get_edge_model().objects
         if isinstance(model, models.Model):
             sequence = sequence.filter(**{sourcename:model})
         sequence = sequence.filter(
             **{targetname:OuterRef('pk')}
+        ).annotate(
+            **{sort_field_name: Min(self.sequence_field_name)}
         )
-        return Subquery(sequence.values(self.sequence_field_name))
+        # WARNING: this is non deterministic as we only use the first!
+        return Subquery(sequence.values(sort_field_name)[:1])
+
+    def get_edge_rel_sort_query_component(self, model, targetname, sourcename):
+        """
+        Builds a query component that can be used for sorting a children of
+        a dag Node.
+        The returned query is relative to the Edge
+
+        :return: django F() expressions
+        """
+        return F(self.sequence_field_name)
 
     def get_sorted_edge_queryset(self, node, target, source):
         edge_model = node.get_edge_model()

@@ -150,7 +150,7 @@ def node_manager_factory(base_manager_class, ordering=None, ):
 
             instance_or_model = getattr(self, 'instance', self.model)
             return self.get_queryset().annotate(
-                _sequence=self.sequence_manager.get_relatedsort_query_component(
+                _sequence=self.sequence_manager.get_node_rel_sort_query_component(
                     instance_or_model, target, source)
             ).order_by('_sequence')
 
