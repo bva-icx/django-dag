@@ -9,26 +9,48 @@ from django.db import models
 from django.conf import settings
 from importlib import import_module
 from .order_control import BaseDagOrderController
+from .backends.base import BaseNode as NodeBase
 
 module_name = getattr(settings, 'DJANGO_DAG_BACKEND', "django_dag.models.backends.standard")
 backend = import_module(module_name)
 
+BaseNodeManager = backend.ProtoNodeManager
+BaseEdgeManager = backend.ProtoEdgeManager
+BaseNodeQuerySet = backend.ProtoNodeQuerySet
+BaseEdgeQuerySet = backend.ProtoEdgeQuerySet
 
-def edge_manager_factory(base_model, ordering=None, ):
+__all__ =[
+    "edge_manager_factory",
+    "node_manager_factory",
+    "edge_factory",
+    "node_factory",
+    "BaseNodeManager",
+    "BaseEdgeManager",
+    "BaseNodeQuerySet",
+    "BaseEdgeQuerySet",
+    "BaseDagOrderController",
+]
+
+
+def _get_base_manager(base_model, base_merge_manager):
     _default_manager_class = None
-
     _default_manager = getattr(base_model, '_default_manager', None)
     if _default_manager:
         _default_manager_class = base_model._default_manager.__class__
-
     if _default_manager_class:
-        class MergerManager(_default_manager_class, backend.ProtoEdgeManager):
+        class MergerManager(_default_manager_class, base_merge_manager):
             pass
         _default_manager_class = MergerManager
     else:
-        _default_manager_class = backend.ProtoEdgeManager
-
+        _default_manager_class = base_merge_manager
     return _default_manager_class
+
+def edge_manager_factory(base_manager_class, ordering=None):
+    class EdgeManager(base_manager_class):
+        pass
+
+    EdgeManager.ordering = ordering
+    return EdgeManager
 
 
 def edge_factory( node_model,
@@ -37,6 +59,8 @@ def edge_factory( node_model,
         ordering = False,
         concrete = True,
         base_model = models.Model,
+        manager = None,
+        queryset = None,
     ):
     """
     Dag Edge factory
@@ -49,11 +73,16 @@ def edge_factory( node_model,
     else:
         node_model_name = node_model._meta.model_name
 
+    edge_manager = edge_manager_factory(
+            _get_base_manager(base_model, backend.ProtoNodeManager),
+            ordering,
+        ) if manager is None else manager
+
     class Edge(base_model):
         class Meta:
             abstract = not concrete
 
-        objects = edge_manager_factory(base_model, ordering,)()
+        objects = edge_manager() if queryset is None else edge_manager.from_queryset(queryset)()
 
         parent = models.ForeignKey(
             node_model,
@@ -88,20 +117,8 @@ def edge_factory( node_model,
     return Edge
 
 
-def node_manager_factory(base_model, ordering=None, ):
-    _default_manager_class = None
-    _default_manager = getattr(base_model, '_default_manager', None)
-    if _default_manager:
-        _default_manager_class = base_model._default_manager.__class__
-
-    if _default_manager_class:
-        class MergerManager(_default_manager_class, backend.ProtoEdgeManager):
-            pass
-        _default_manager_class = MergerManager
-    else:
-        _default_manager_class = backend.ProtoEdgeManager
-
-    class NodeManager(_default_manager_class):
+def node_manager_factory(base_manager_class, ordering=None, ):
+    class NodeManager(base_manager_class):
         sequence_manager = ordering
 
         def ordered(self,):
@@ -147,7 +164,6 @@ def node_manager_factory(base_model, ordering=None, ):
     class NodeQuerySet(models.QuerySet):
         sequence_manager = ordering
 
-    #return NodeManager, NodeQuerySet
     return NodeManager
 
 
@@ -156,14 +172,21 @@ def node_factory( edge_model,
         base_model = models.Model,
         field = models.ManyToManyField,
         ordering = False,
+        manager = None,
+        queryset = None,
     ):
     """Dag Node factory"""
+
+    node_manager = node_manager_factory(
+            _get_base_manager(base_model, backend.ProtoNodeManager),
+            ordering,
+        ) if manager is None else manager
 
     class Node(base_model, backend.ProtoNode):
         class Meta:
             abstract = True
 
-        objects = node_manager_factory(base_model, ordering,)()
+        objects = node_manager() if queryset is None else node_manager.from_queryset(queryset)()
         children  = models.ManyToManyField(
                 'self',
                 blank = children_null,

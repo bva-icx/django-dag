@@ -1,10 +1,13 @@
 from django.db import models
 from django_dag.exceptions import NodeNotReachableException
+from django.db.models.query import QuerySet
 from .base import BaseNode
 
 
 ProtoNodeManager = models.Manager
 ProtoEdgeManager = models.Manager
+ProtoNodeQuerySet = QuerySet
+ProtoEdgeQuerySet = QuerySet
 
 class ProtoNode(BaseNode):
     ################################################################

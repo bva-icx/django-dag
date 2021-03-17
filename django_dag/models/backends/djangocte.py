@@ -20,12 +20,14 @@ from django.db.models import FilteredRelation
 from django.db.models import Exists, OuterRef, Subquery
 from django.db.models import Max
 from django_dag.exceptions import NodeNotReachableException
+from django_cte import CTEQuerySet, With
 from django_cte import CTEManager, With
 from .base import BaseNode
 
 ProtoNodeManager = CTEManager
 ProtoEdgeManager = CTEManager
-
+ProtoNodeQuerySet = CTEQuerySet
+ProtoEdgeQuerySet = CTEQuerySet
 
 class ProtoNode(BaseNode):
     def make_related_cte_fn(self, remote_name, local_name):
