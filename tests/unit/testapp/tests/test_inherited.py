@@ -77,5 +77,22 @@ class DagStructureTestsDerived(TestCase):
         self.nodes.pA9.add_parent(self.nodes.pA6)
         self.nodes.pA9.add_child(self.nodes.pA10)
 
-    def test_creation(self,):
-        pass
+    def test_model_node_type(self,):
+        self.assertEqual(
+            self.nodes.pA1.get_node_model(),
+            BaseDerivedNode
+        )
+        self.assertEqual(
+            self.nodes.pB12.get_node_model(),
+            BaseDerivedNode
+        )
+
+    def test_model_edge_type(self,):
+        self.assertEqual(
+            self.nodes.pA1.get_edge_model(),
+            DerivedEdge
+        )
+        self.assertEqual(
+            self.nodes.pB12.get_edge_model(),
+            DerivedEdge
+        )
