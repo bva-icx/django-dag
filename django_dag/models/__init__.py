@@ -10,6 +10,7 @@ from django.conf import settings
 from importlib import import_module
 from .order_control import BaseDagOrderController
 from .backends.base import BaseNode as NodeBase
+from django.db.models import F
 
 module_name = getattr(settings, 'DJANGO_DAG_BACKEND', "django_dag.models.backends.standard")
 backend = import_module(module_name)
@@ -121,12 +122,12 @@ def node_manager_factory(base_manager_class, ordering=None, ):
     class NodeManager(base_manager_class):
         sequence_manager = ordering
 
-        def ordered(self,):
+        def with_ordered(self, fieldname=None):
             """
             If the Node ordering then this modifies the queryset to order
             the nodes by the Node or Edge sequence as defined by the model
 
-            The resultant Node is annotated with the _sequence value
+            The resultant Node is annotated with the sequence value
 
             :return: QuerySet,
             """
@@ -134,6 +135,7 @@ def node_manager_factory(base_manager_class, ordering=None, ):
                 return self
 
             sequence_field_name = self.sequence_manager.sequence_field_name
+            fieldname = self.sequence_manager.sequence_field_name
             if not hasattr(self, 'target_field_name'):
                 # If we don't haave a target_field_name we are probably not a related
                 # manager so we can not order by
@@ -149,11 +151,17 @@ def node_manager_factory(base_manager_class, ordering=None, ):
                 target, source = self.target_field_name, self.source_field_name
 
             instance_or_model = getattr(self, 'instance', self.model)
-            return self.get_queryset().annotate(
-                _sequence=self.sequence_manager.get_node_rel_sort_query_component(
+            order_query = self.sequence_manager.get_node_rel_sort_query_component(
                     instance_or_model, target, source)
-            ).order_by('_sequence')
 
+            if isinstance(order_query, F):
+                if order_query.name == fieldname:
+                    # We are ordering by an field on the primary model
+                    return self.get_queryset().order_by(fieldname)
+
+            return self.get_queryset().annotate(
+                **{fieldname: order_query}
+            )
 
         #def get_queryset(self):
         #    qs = super().get_queryset()
