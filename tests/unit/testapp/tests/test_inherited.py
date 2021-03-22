@@ -6,18 +6,49 @@ from django.shortcuts import render_to_response
 from django.core.exceptions import ValidationError
 from .tree_test_output import expected_tree_output
 from ..models.inherited import (
-    BaseDerivedNode, DerivedNodeA, DerivedNodeB, DerivedEdge
+    BaseDerivedNode, DerivedNodeA, DerivedNodeB, DerivedEdge,
+    ConcreteBaseNode, InheritedConcreteNode, InheritedConcreteEdge,
 )
 from django_dag.exceptions import NodeNotReachableException
 
+
 class NodeStorage():
     pass
+
+
+class DagStructureTestsConcreteInherited(TestCase):
+    def setUp(self,):
+        self.nodes = NodeStorage()
+        for i in range(1, 12):
+            InheritedConcreteNode(name="%s" % i).save()
+            setattr(self.nodes, "p%s" % i, InheritedConcreteNode.objects.get(pk=i))
+        self.build_structure()
+
+    def build_structure(self,):
+        for a in range(0,20):
+            # Shift id of edge:
+            self.nodes.p1.add_child(self.nodes.p2)
+            self.nodes.p1.remove_child(self.nodes.p2)
+        self.nodes.p1.add_child(self.nodes.p5)
+        self.nodes.p5.add_child(self.nodes.p7)
+        self.nodes.p1.add_child(self.nodes.p6)
+        self.nodes.p6.add_child(self.nodes.p7)
+        self.nodes.p2.add_child(self.nodes.p6)
+        self.nodes.p3.add_child(self.nodes.p7)
+        self.nodes.p6.add_child(self.nodes.p8)
+        self.nodes.p2.add_child(self.nodes.p8)
+        self.nodes.p6.add_parent(self.nodes.p4)
+        self.nodes.p9.add_parent(self.nodes.p3)
+        self.nodes.p9.add_parent(self.nodes.p6)
+        self.nodes.p9.add_child(self.nodes.p10)
+
+    def test_creation(self,):
+        pass
 
 class DagStructureTestsDerived(TestCase):
     def setUp(self,):
         self.nodes = NodeStorage()
         for i in range(1, 12):
-
             DerivedNodeA(name="%s" % i).save()
             setattr(self.nodes, "pA%s" % i, DerivedNodeA.objects.get(pk=i))
         for i in range(12, 24):

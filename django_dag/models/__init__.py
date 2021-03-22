@@ -39,10 +39,23 @@ def _get_base_manager(base_model, base_merge_manager):
     if _default_manager:
         _default_manager_class = base_model._default_manager.__class__
     if _default_manager_class:
-        class MergerManager(_default_manager_class, base_merge_manager):
+        if base_merge_manager != _default_manager_class:
+            _default_manager_class = base_merge_manager
+        elif issubclass(_default_manager_class, base_merge_manager):
+            # the default manager is already a subclass of base_merge_manager
+            # so use _default_manager_class
             pass
-        _default_manager_class = MergerManager
+        elif issubclass(base_merge_manager, _default_manager_class):
+            # the base manager is already a subclass of _default_manager_class
+            # so use base_merge_manager
+            _default_manager_class = base_merge_manager
+        else:
+            # The two classes are not common merge the classes
+            class MergerManager(_default_manager_class, base_merge_manager):
+                pass
+            _default_manager_class = MergerManager
     else:
+        # No default manager use base_merge_manager
         _default_manager_class = base_merge_manager
     return _default_manager_class
 
@@ -55,8 +68,8 @@ def edge_manager_factory(base_manager_class, ordering=None):
 
 
 def edge_factory( node_model,
-        child_to_field = "id",
-        parent_to_field = "id",
+        child_to_field = None,
+        parent_to_field = None,
         ordering = False,
         concrete = True,
         base_model = models.Model,
@@ -66,13 +79,6 @@ def edge_factory( node_model,
     """
     Dag Edge factory
     """
-    if isinstance(node_model, str):
-        try:
-            node_model_name = node_model.split('.')[-1]
-        except IndexError:
-            node_model_name = node_model
-    else:
-        node_model_name = node_model._meta.model_name
 
     edge_manager = edge_manager_factory(
             _get_base_manager(base_model, backend.ProtoNodeManager),
@@ -87,13 +93,13 @@ def edge_factory( node_model,
 
         parent = models.ForeignKey(
             node_model,
-            related_name = "%s_child" % node_model_name,
+            related_name="%(class)s_child",
             to_field = parent_to_field,
             on_delete=models.CASCADE
             )
         child = models.ForeignKey(
             node_model,
-            related_name = "%s_parent" % node_model_name,
+            related_name="%(class)s_parent",
             to_field = child_to_field,
             on_delete=models.CASCADE
             )
