@@ -2,8 +2,11 @@
 from django.db.models import CharField, Model
 from django_dag.models import node_factory, edge_factory
 
-################################################################
-# Dag models with with custom bases
+
+
+###############################################################################
+# Dag Nodes which are derived from a single concrete base
+
 
 class ConcreteBaseNode(Model):
     parent_name = CharField(max_length=32, blank=True, null=True)
@@ -34,6 +37,10 @@ class InheritedConcreteEdge(edge_factory(InheritedConcreteNode, concrete=False))
 
     class Meta:
         app_label = 'testapp'
+
+
+###############################################################################
+# Multiple Dag Nodes classes attached in a single DAG
 
 
 class BaseDerivedNode(
