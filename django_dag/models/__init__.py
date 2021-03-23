@@ -128,7 +128,7 @@ def node_manager_factory(base_manager_class, ordering=None, ):
     class NodeManager(base_manager_class):
         sequence_manager = ordering
 
-        def with_ordered(self, fieldname=None):
+        def with_sequence(self, fieldname=None):
             """
             If the Node ordering then this modifies the queryset to order
             the nodes by the Node or Edge sequence as defined by the model

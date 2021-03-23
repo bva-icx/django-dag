@@ -156,11 +156,11 @@ class EdgeSortedDagRelationshipTests(TestCase):
     def test_children_ordered_filter(self):
         self.assertEqual(
             list(self.nodes.p1.children \
-                    .with_ordered().order_by('sequence').values_list('pk', 'sequence')),
+                    .with_sequence().order_by('sequence').values_list('pk', 'sequence')),
             [(7,4), (6,8), (5,12)])
         self.assertEqual(
             list(self.nodes.p2.children \
-                    .with_ordered().order_by('sequence').values_list('pk', 'sequence')),
+                    .with_sequence().order_by('sequence').values_list('pk', 'sequence')),
             [(5,1), (7,4), (6,8)])
 
     @unittest.skip('no exception or test written as yet')
@@ -170,7 +170,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
     def test_parent_ordered_filter(self):
         self.assertEqual(
             list(self.nodes.p5.parents \
-                    .with_ordered().order_by('sequence').values_list('pk', 'sequence')),
+                    .with_sequence().order_by('sequence').values_list('pk', 'sequence')),
             [(2,1), (1,12)])
 
     def test_can_get_first_child_of_node(self):
@@ -178,7 +178,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         self.assertEqual(self.nodes.p2.get_first_child(), self.nodes.p5)
         self.assertEqual(
             self.nodes.p2.get_first_child(),
-            self.nodes.p2.children.with_ordered().order_by('sequence').first(),
+            self.nodes.p2.children.with_sequence().order_by('sequence').first(),
             )
         self.assertEqual(self.nodes.p6.get_first_child(), None)
 
@@ -187,7 +187,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         self.assertEqual(self.nodes.p2.get_last_child(), self.nodes.p6)
         self.assertEqual(
             self.nodes.p2.get_last_child(),
-            self.nodes.p2.children.with_ordered().order_by('sequence').last(),
+            self.nodes.p2.children.with_sequence().order_by('sequence').last(),
             )
         self.assertEqual(self.nodes.p6.get_last_child(), None)
 
@@ -197,7 +197,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         # self.assertEqual(self.nodes.p6.get_first_parent(), self.nodes.p1)
         self.assertEqual(
             self.nodes.p5.get_first_parent(),
-            self.nodes.p5.parents.with_ordered().order_by('sequence').first(),
+            self.nodes.p5.parents.with_sequence().order_by('sequence').first(),
             )
 
     def test_can_get_last_parent_of_node(self):
@@ -206,7 +206,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         # self.assertEqual(self.nodes.p6.get_first_parent(), self.nodes.p1)
         self.assertEqual(
             self.nodes.p5.get_last_parent(),
-            self.nodes.p5.parents.with_ordered().order_by('sequence').last(),
+            self.nodes.p5.parents.with_sequence().order_by('sequence').last(),
             )
 
     def test_can_get_next_sibling_of_node(self):
@@ -285,19 +285,19 @@ class NodeSortedDagRelationshipTests(TestCase):
     def test_children_ordered_filter(self):
         self.assertEqual(
             list(self.nodes.p1.children \
-                    .with_ordered().order_by('sequence') \
+                    .with_sequence().order_by('sequence') \
                     .values_list('pk', 'sequence')),
             [(5, 2), (4, 6), (3, 12)])
         self.assertEqual(
             list(self.nodes.p2.children \
-                    .with_ordered().order_by('sequence') \
+                    .with_sequence().order_by('sequence') \
                     .values_list('pk', 'sequence')),
             [(6, 1), (8, 8), (7, 11)])
 
     def test_ordered_filter_on_node(self):
         self.assertEqual(
             list(OrderedNode.objects \
-                    .with_ordered().order_by('sequence') \
+                    .with_sequence().order_by('sequence') \
                     .filter(sequence__gt=0).values_list('pk', 'sequence')),
             [(6, 1), (5, 2), (4, 6), (8, 8), (7, 11), (3, 12)])
 
@@ -322,7 +322,7 @@ class NodeSortedDagRelationshipTests(TestCase):
         self.assertEqual(self.nodes.p4.get_first_parent(), self.nodes.p1)
         self.assertEqual(
             self.nodes.p4.get_first_parent(),
-            self.nodes.p4.parents.with_ordered().order_by('sequence').first(),
+            self.nodes.p4.parents.with_sequence().order_by('sequence').first(),
             )
 
     def test_can_get_last_parent_of_node(self):
@@ -338,7 +338,7 @@ class NodeSortedDagRelationshipTests(TestCase):
         self.assertEqual(self.nodes.p4.get_last_parent(), self.nodes.p9)
         self.assertEqual(
             self.nodes.p4.get_last_parent(),
-            self.nodes.p4.parents.with_ordered().order_by('sequence').last(),
+            self.nodes.p4.parents.with_sequence().order_by('sequence').last(),
             )
 
     def test_can_get_next_sibling_of_node(self):
