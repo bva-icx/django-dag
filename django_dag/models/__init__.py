@@ -75,6 +75,7 @@ def edge_factory( node_model,
         base_model = models.Model,
         manager = None,
         queryset = BaseEdgeQuerySet,
+        related_name_base = ''
     ):
     """
     Dag Edge factory
@@ -93,13 +94,15 @@ def edge_factory( node_model,
 
         parent = models.ForeignKey(
             node_model,
-            related_name="%(class)s_child",
+            related_name="%schild_%%(class)s_set"%(related_name_base,),
+            related_query_name="%schild_%%(class)ss"%(related_name_base,),
             to_field = parent_to_field,
             on_delete=models.CASCADE
             )
         child = models.ForeignKey(
             node_model,
-            related_name="%(class)s_parent",
+            related_name="%sparent_%%(class)s_set"%(related_name_base,),
+            related_query_name="%sparent_%%(class)ss"%(related_name_base,),
             to_field = child_to_field,
             on_delete=models.CASCADE
             )
