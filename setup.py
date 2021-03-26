@@ -24,6 +24,10 @@ def root_dir():
         return '.'
 
 long_desc = open(os.path.join(root_dir(), 'README')).read()
+install_requires = [
+"django==2.2",
+"deprecation"
+]
 
 setup_args=dict(
     name='django-dag',
@@ -38,6 +42,7 @@ setup_args=dict(
     description='Directed Acyclic Graph implementation for Django 1.6+',
     classifiers=classifiers,
     long_description=long_desc,
+    install_requires= install_requires
 )
 
 

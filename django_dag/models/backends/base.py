@@ -2,6 +2,7 @@ from django.db import models, connection
 from django.core.exceptions import ValidationError
 from django.db.models import Case, When
 
+from deprecation import deprecated
 
 def filter_order(queryset, field_names, values):
     """
@@ -227,14 +228,14 @@ class BaseNode(object):
         """
         raise NotImplementedError()
 
-    @depreciated
+    @deprecated()
     def node_set(self):
         return self.clan
 
-    @depreciated
+    @deprecated()
     def descendants_set(self):
         return self.descendants
 
-    @depreciated
+    @deprecated()
     def ancestors_set(self):
         return self.ancestors
