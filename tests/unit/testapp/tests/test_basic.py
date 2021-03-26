@@ -323,7 +323,6 @@ class DagStructureTests(TestCase):
     def test_can_find_ancestors(self):
         self.assertEqual([p.name for p in self.nodes.p6.ancestors_set()], ['1', '2', '4'])
 
-    @unittest.expectedFailure
     def test_dag_tree_render(self):
         # Testing the view
         response = render_to_response('tree.html', { 'dag_list': BasicNode.objects.all()})
