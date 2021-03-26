@@ -312,6 +312,35 @@ class DagStructureTests(TestCase):
         self.assertEqual(self.expand_path(self.nodes.p4.get_paths(self.nodes.p10)), [['6', '9', '10']])
         self.assertEqual(self.expand_path(self.nodes.p3.get_paths(self.nodes.p10)), [['4', '6', '9', '10']])
 
+    
+    def test_paths_Edge_options_with_duplicate_edge(self,):
+        self.nodes.p2.add_child(self.nodes.p11)
+        self.nodes.p2.add_child(self.nodes.p11)
+        paths = self.nodes.p2.get_paths(self.nodes.p11,use_edges=True)
+
+        def check_path(p):
+            """check a returned path is waht we expect"""
+            self.assertEqual(len(p),1)
+            self.assertEqual(p[0].parent,self.nodes.p2)
+            self.assertEqual(p[0].child,self.nodes.p11)
+
+        self.assertEqual(len(paths),2)
+        ## Check the two paths.
+        check_path(paths[0])
+        check_path(paths[1])
+
+    def test_paths_node_options_with_duplicate_edge(self,):
+        self.nodes.p2.add_child(self.nodes.p11)
+        self.nodes.p2.add_child(self.nodes.p11)
+        paths = self.nodes.p2.get_paths(self.nodes.p11,)
+
+        # The paths are identical so we don't
+        # expect duplicare return
+        self.assertEqual(len(paths),1)
+        self.assertEqual(len(paths[0]),1)
+        self.assertEqual(paths[0][0],self.nodes.p11)
+
+
     def test_path_raise_for_unattached_nodes(self,):
         with self.assertRaises(NodeNotReachableException) as add_err_cm:
             self.nodes.p7.get_paths(self.nodes.p10)

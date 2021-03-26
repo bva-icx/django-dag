@@ -1,3 +1,5 @@
+import sys
+
 from django.db import models
 from django_dag.exceptions import NodeNotReachableException
 from django.db.models.query import QuerySet
@@ -69,42 +71,54 @@ class ProtoNode(BaseNode):
 
     def _get_paths(self, target, use_edges=False, downwards=True):
         if self == target:
-            # There can only be 1 zero length path, it also has no edge
-            # so we can always return [] for the path
+            # In principle can only be 1 zero length path, it also has no edge
+            # so we can always return [] for the path. It can't have an edge, because
+            # a self link forms a cycle of legnth one, and we try to guarantee being
+            # cycle free (this as Directed-ACYCLIC-Graph)
             return [[],]
+
         if target in self.children.all():
             # If the target is a child of the source object there can only
             # be 1 shortest path
             if use_edges:
-                return [ list(self.get_edge_model().objects.filter(
+                return [ [e] for e in  self.get_edge_model().objects.filter(
                         child=target,
                         parent=self
-                    )), ]
+                    ) ]
             else:
                 return [[target if downwards else self],]
 
         if target.pk in self.get_descendant_pks():
             paths = []
-            path_length = 0
+            path_length = sys.maxsize
             childItems = self.get_edge_model().objects.filter(
                     parent=self
                 )
 
             for child_edge in childItems:
+                # Select the element in the return data struct.
                 if use_edges:
-                    node = child_edge
+                    element = child_edge
                 else:
-                    node = child_edge.child if downwards else child_edge.parent
+                    element = child_edge.child if downwards else child_edge.parent
+
                 try:
+                    # Use ourselves recursively to find the rest of 
+                    # the path (if extant) from each of our children
                     desc_paths = child_edge.child._get_paths(target,
                         use_edges=use_edges,downwards=downwards)
                     desc_path_length = len(desc_paths[0]) + 1
-                    if not paths or desc_path_length < path_length:
-                        paths = [ [node] + subpath for subpath in desc_paths ]
+
+
+                    if desc_path_length < path_length:
+                        # We found a short path than anything before, so replace.
+                        paths = [ [element] + subpath for subpath in desc_paths ]
                         path_length = len(paths[0])
-                    elif bool(paths) and desc_path_length == path_length:
-                        equal_paths = [ [node] + subpath for subpath in desc_paths ]
+                    elif desc_path_length == path_length:
+                        # We found a path of equal length so append to results
+                        equal_paths = [ [element] + subpath for subpath in desc_paths ]
                         paths.extend(equal_paths)
+                    #else a short path has already found so skip recording this one
 
                 except NodeNotReachableException:
                     pass
