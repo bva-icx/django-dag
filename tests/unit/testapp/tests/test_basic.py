@@ -336,6 +336,13 @@ class DagStructureTests(TestCase):
             self.assertEqual([p.name for p in self.nodes.p11.get_roots()], ['11'])
             self.assertEqual([p.name for p in self.nodes.p11.get_leaves()], ['11'])
 
+    def test_can_get_root_and_leaf_nodes_on_a_lonely_node(self,):
+        lonelynode = BasicNode(name="lonely")
+        lonelynode.save()
+        self.assertEqual([p.name for p in lonelynode.get_leaves()], ['lonely'])
+        self.assertEqual([p.name for p in lonelynode.get_roots()], ['lonely'])
+
+
     def test_node_know_if_it_a_root_or_leaf_node(self,):
         self.assertTrue(self.nodes.p1.is_root)
         self.assertFalse(self.nodes.p1.is_leaf)
