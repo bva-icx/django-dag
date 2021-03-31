@@ -206,12 +206,12 @@ class EdgeSortedDagRelationshipTests(TestCase):
 
     def test_can_get_next_sibling_of_node(self):
         self.assertEqual(
-            self.nodes.p7.get_next_sibling(self.nodes.p1),
-            self.nodes.p6)
+            self.nodes.p6.get_next_sibling(self.nodes.p1),
+            self.nodes.p5)
         self.assertEqual(self.nodes.p5.get_next_sibling(self.nodes.p1), None)
         self.assertEqual(
-            self.nodes.p7.get_next_sibling(self.nodes.p2),
-            self.nodes.p6)
+            self.nodes.p5.get_next_sibling(self.nodes.p2),
+            self.nodes.p7)
         self.assertEqual(
             self.nodes.p6.get_next_sibling(self.nodes.p2), None)
 

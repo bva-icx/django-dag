@@ -123,6 +123,11 @@ class DagEdgeIntSorter(BaseDagOrderController):
 
     def get_next_sibling(self, basenode, parent_node):
         edge_model = basenode.get_edge_model()
+        ## Our process here is to
+        # Find edges which come off the base's parent node,
+        # and are numbered higher than our found base to parent link.
+        # These are then order and the first one by sequne selected.
+        # Note: assumes only one edges is possible, or raise MultipleObjectsReturned
         try:
             sibling_node_edge = edge_model.objects.filter(
                 parent=parent_node,
@@ -133,9 +138,11 @@ class DagEdgeIntSorter(BaseDagOrderController):
             ).order_by(self.sequence_field_name).select_related('child').first()
         except ObjectDoesNotExist:
             return None
+        # Return the endpoint of the selected edge iff exists.
         return sibling_node_edge.child if sibling_node_edge else None
 
     def get_prev_sibling(self, basenode, parent_node):
+        ## See above for breakdown of quesry
         edge_model = basenode.get_edge_model()
         try:
             sibling_node_edge = edge_model.objects.filter(
