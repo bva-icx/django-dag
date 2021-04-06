@@ -384,6 +384,7 @@ class DagStructureTests(TestCase):
     def test_distance_between_nodes(self,):
         self.assertEqual(self.nodes.p1.distance(self.nodes.p7), 2)
         self.assertEqual(self.nodes.p7.distance(self.nodes.p1), -2)
+        self.assertEqual(self.nodes.p7.distance(self.nodes.p1, directed = False), 2)
 
     def test_can_get_root_and_leaf_nodes_from_node(self,):
         with self.subTest("in tree"):

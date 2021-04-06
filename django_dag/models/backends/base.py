@@ -117,18 +117,27 @@ class BaseNode(object):
         """
         parent.children.through.objects.get(parent = parent, child = self).delete()
 
-    def distance(self, target):
+    def distance(self, target, directed = True):
         """
         Finds the shortest hops count to the target vertex
+
+        By default this returns the SIGNED distances with
+        negative results indicating direction for child to
+        parent (eg against the edges direction)
+
+        :param target: destination node
+        :param directed: If true return a signed distances, with
+                         a negative value for distances of child to parent.
         :raises: NodeNotReachableException
         :rtype: int
         :return: The shortest hops count to the target vertex
         """
+        reversing_sign = -1 if directed else 1
         try:
             return len(self.get_paths(target, downwards=True)[0])
         except NodeNotReachableException as err:
             pass
-        return - len(self.get_paths(target, downwards=False)[0])
+        return reversing_sign * len(self.get_paths(target, downwards=False)[0])
 
     @property
     def clan(self):
