@@ -1,5 +1,6 @@
 import multiprocessing
 import unittest
+from django.conf import settings
 
 from django.test import TestCase
 from django.shortcuts import render_to_response
@@ -7,6 +8,8 @@ from django.core.exceptions import ValidationError
 from .tree_test_output import expected_tree_output
 from ..models.basic import BasicNode, BasicEdge, BasicNodeES, BasicEdgeES
 from django_dag.exceptions import NodeNotReachableException
+from django_dag.models import node_factory, node_manager_factory,BaseNodeManager
+from django.db import models
 
 class NodeStorage():
     pass
@@ -15,6 +18,34 @@ class DagTestCase(TestCase):
     def setUp(self):
         for i in range(1, 11):
             BasicNode(name="%s" % i).save()
+
+    def test_node_factory_repects_base_classes(self,):
+
+        #
+        # This test checks for early failure in djangocte
+        # style models.in those cases at the momeent you
+        # need to make sure that the QS/ manager derives from
+        # the CTE version if you override them. This isn't
+        # needed inthe std version, so the API is not orthogonal.(FIXME)
+        if not hasattr(settings,'DJANGO_DAG_BACKEND') or not settings.DJANGO_DAG_BACKEND.endswith('djangocte'):
+            return
+
+        class MyQS(models.QuerySet): pass
+        class MyManager(node_manager_factory(BaseNodeManager)):pass
+        class MyModel(models.Model):
+            manager = MyManager
+
+        with self.assertRaises(Exception):
+            #This should trigger the assertion in CTEManager.from_queryset()
+            class dagmodel(node_factory('Edges',base_model=MyModel,
+                        manager=MyManager,
+                        queryset=MyQS
+                        )): pass
+
+        #self.assertTrue(issubclass(MyModel,models.Model))
+        #self.assertTrue(issubclass(dagmodel,MyModel))
+        #self.assertTrue(isinstance(dagmodel.objects,MyManager))
+#        #self.assertTrue(isinstance(dagmodel.objects.get_queryset(),MyQS))
 
     def test_objects_were_created(self):
         for i in range(1, 11):
@@ -25,7 +56,8 @@ class DagTestCase(TestCase):
         """
         Create a deep graph and check that graph operations run in a
         reasonable amount of time (linear in size of graph, not
-        exponential).
+        dxponential).
+
         """
         def run_test():
             # There are on the order of 1 million paths through the graph, so
@@ -430,6 +462,7 @@ class DagStructureTests(TestCase):
     def test_ordering_of_ancestor_nodes(self):
         # Note: What ordering promises fo we make?
         pass
+
 
     def test_can_find_clan(self):
         self.assertEqual(
