@@ -42,23 +42,12 @@ ProtoEdgeQuerySet = CTEQuerySet
 
 class ProtoNode(BaseNode):
     def make_related_cte_fn(self, remote_name, local_name):
-        def make_related_cte(cte):
-            edge_model = self.get_edge_model()
-            basic_cte_query = edge_model.objects.filter(**{local_name:self.pk}) \
-                .values(
-                    nid=F(remote_name),
-                    depth=Value(1, output_field=models.IntegerField())
-                ) \
-                .union(
-                    cte.join(edge_model, **{local_name:cte.col.nid}) \
-                        .values(
-                            nid=F(remote_name),
-                            depth=cte.col.depth + Value(1, output_field=models.IntegerField())
-                        ).distinct(),
-                        all=False,
-                )
-            return basic_cte_query
-        return make_related_cte
+        return self._base_tree_cte_builder(
+                local_name,'nid',
+                {'nid':F(remote_name),},
+                {'depth':Value(1, output_field=models.IntegerField()) },
+                lambda cte: {'depth': cte.col.depth + Value(1, output_field=models.IntegerField()) },
+        )
 
     @property
     def descendants(self):
@@ -98,25 +87,39 @@ class ProtoNode(BaseNode):
             .with_cte(cte).order_by('id', 'depth') \
             .annotate(depth=Max(cte.col.depth))
 
-    def make_root_leaf_cte_fn(self, remote_name, local_name):
-        def make_related_cte(cte):
-            edge_model = self.get_edge_model()
-            basic_cte_query = edge_model.objects.filter(**{local_name:self.pk}) \
-                .values(
-                    rid=F(remote_name),
-                    lid=F(local_name),
-                ) \
-                .union(
-                    cte.join(edge_model, **{local_name:cte.col.rid}) \
-                        .values(
-                            rid=F(remote_name),
-                            lid=F(local_name),
-                        ).distinct(),
-                        all=False,
-                )
-            return basic_cte_query
-        return make_related_cte
+    def _base_tree_cte_builder(self, local_name, link_name, result_spec, recurse_end, recurse_next):
 
+        # Since we have a recurse use for CTE, and  tree srutue all our cte's look
+        # similar  we walk from localname on across to link name, making a union
+        # so the values in results table look similar (result_spec) it jus the 
+        # initial quiery needs to seen some values (recurse_end) and recurse_next
+        # contains optional calcs.
+
+        def cte_builder(cte):
+            recurse_end_values = recurse_end(cte) if callable(recurse_end) else dict(recurse_end)
+            recurse_end_values.update(result_spec)
+
+            recurse_next_values = recurse_next(cte) if callable(recurse_next) else dict(recurse_next)
+            recurse_next_values.update(result_spec)
+
+            edge_model = self.get_edge_model()
+            basic_cte_query = ( edge_model.objects.filter(**{local_name:self.pk})
+                .values( **recurse_end_values)
+                .union(
+                    cte.join(edge_model, **{local_name: getattr(cte.col,link_name)})
+                    .values(**recurse_next_values)
+                    .distinct(),
+                    all = False
+                ))
+            return basic_cte_query
+        return cte_builder
+
+    def make_root_leaf_cte_fn(self, remote_name, local_name):
+        return self._base_tree_cte_builder(
+                local_name,'rid',
+                {'rid':F(remote_name),'lid':F(local_name),},
+                {},{},
+        )
     def get_roots(self):
         return self._get_source_sink_node('parent_id', 'child_id')
 
@@ -150,34 +153,23 @@ class ProtoNode(BaseNode):
             .order_by('id')
         return datarows
 
+
+
     def make_path_cte_fn(self, field_name, source, target):
-        def make_path_cte(paths):
-            edge_model = self.get_edge_model()
-            basic_paths_cte_query = edge_model.objects.filter(parent_id=source.pk) \
-                .values(
-                    cid=F('child_id'),
-                    pid=F('parent_id'),
-                    path=F(field_name),
-                    depth=Value(1, output_field=models.IntegerField())
-                ) \
-                .union(
-                    paths.join(
-                            edge_model.objects.filter(~Q(parent_id=target.pk)),
-                            parent_id=paths.col.cid
-                        ) \
-                        .values(
-                            cid=F('child_id'),
-                            pid=F('parent_id'),
-                            path=Concat(
-                                paths.col.path, Value(","), F(field_name),
-                                output_field=models.TextField(),
-                            ),
-                            depth=paths.col.depth + Value(1, output_field=models.IntegerField())
-                        ).distinct(),
-                        all=False,
-                )
-            return basic_paths_cte_query
-        return make_path_cte
+        return source.make_path_src_cte_fn(field_name, target)
+
+    def make_path_src_cte_fn(self, field_name, target):
+        return self._base_tree_cte_builder(
+                'parent_id','cid',
+                {'cid':F('child_id'),'pid':F('parent_id'),},
+                {'path':F(field_name),'depth':Value(1, output_field=models.IntegerField())},
+                lambda cte: {'path': Concat(
+                                cte.col.path, Value(","), F(field_name),
+                                output_field=models.TextField(),),
+                            'depth':cte.col.depth + Value(1, output_field=models.IntegerField())
+                            }
+        )
+
 
     def get_paths(self, target, use_edges=False, downwards=None):
         try:
