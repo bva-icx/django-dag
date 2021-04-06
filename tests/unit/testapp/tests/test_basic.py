@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from .tree_test_output import expected_tree_output
 from ..models.basic import BasicNode, BasicEdge, BasicNodeES, BasicEdgeES
 from django_dag.exceptions import NodeNotReachableException
-from django_dag.models import node_factory, node_manager_factory,BaseNodeManager
+from django_dag.models import node_factory,_get_base_manager,  node_manager_factory,BaseNodeManager
 from django.db import models
 
 class NodeStorage():
@@ -18,6 +18,15 @@ class DagTestCase(TestCase):
     def setUp(self):
         for i in range(1, 11):
             BasicNode(name="%s" % i).save()
+
+    def test_base_manager_management_with_unrelated_managers(self,):
+        class UnrelatedManager:pass
+        class SillyModel:
+            _default_manager = UnrelatedManager()
+
+        manager = _get_base_manager(SillyModel,BaseNodeManager)
+        self.assertTrue(issubclass(manager,UnrelatedManager))
+        self.assertTrue(issubclass(manager,BaseNodeManager))
 
     def test_node_factory_repects_base_classes(self,):
 

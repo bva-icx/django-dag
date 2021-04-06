@@ -34,29 +34,30 @@ __all__ =[
 
 
 def _get_base_manager(base_model, base_merge_manager):
-    _default_manager_class = None
+    # Define our initial 'best guess'
     _default_manager = getattr(base_model, '_default_manager', None)
+    _default_manager_class = None
     if _default_manager:
         _default_manager_class = base_model._default_manager.__class__
-    if _default_manager_class:
-        if base_merge_manager != _default_manager_class:
-            _default_manager_class = base_merge_manager
-        elif issubclass(_default_manager_class, base_merge_manager):
-            # the default manager is already a subclass of base_merge_manager
-            # so use _default_manager_class
-            pass
-        elif issubclass(base_merge_manager, _default_manager_class):
-            # the base manager is already a subclass of _default_manager_class
-            # so use base_merge_manager
-            _default_manager_class = base_merge_manager
-        else:
-            # The two classes are not common merge the classes
-            class MergerManager(_default_manager_class, base_merge_manager):
-                pass
-            _default_manager_class = MergerManager
-    else:
+
+    if not  _default_manager_class:
         # No default manager use base_merge_manager
+        return base_merge_manager
+
+    if issubclass(_default_manager_class, base_merge_manager):
+        # the default manager is already a subclass of base_merge_manager
+        # so use _default_manager_class
+        pass
+    elif issubclass(base_merge_manager, _default_manager_class):
+        # the base manager is already a subclass of _default_manager_class
+        # so use base_merge_manager
         _default_manager_class = base_merge_manager
+    else:
+        # The two classes are not common merge the classes
+        class MergerManager(_default_manager_class, base_merge_manager):
+            pass
+        _default_manager_class = MergerManager
+
     return _default_manager_class
 
 def edge_manager_factory(base_manager_class, ordering=None):
