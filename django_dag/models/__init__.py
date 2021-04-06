@@ -144,7 +144,7 @@ def node_manager_factory(base_manager_class, ordering=None, ):
                 return self
 
             sequence_field_name = self.sequence_manager.sequence_field_name
-            fieldname = self.sequence_manager.sequence_field_name
+            fieldname = fieldname or self.sequence_manager.sequence_field_name
             if not hasattr(self, 'target_field_name'):
                 # If we don't haave a target_field_name we are probably not a related
                 # manager so we can not order by

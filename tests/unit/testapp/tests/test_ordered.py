@@ -173,6 +173,14 @@ class EdgeSortedDagRelationshipTests(TestCase):
                     .with_sequence().order_by('sequence').values_list('pk', 'sequence')),
             [(2,1), (1,12)])
 
+
+    def test_parent_ordered_filter_alternatename(self):
+        self.assertEqual(
+            list(self.nodes.p5.parents \
+                    .with_sequence('alternate').order_by('alternate').values_list('pk', 'alternate')),
+            [(2,1), (1,12)])
+
+
     def test_can_get_first_child_of_node(self):
         self.assertEqual(self.nodes.p1.get_first_child(), self.nodes.p7)
         self.assertEqual(self.nodes.p2.get_first_child(), self.nodes.p5)
