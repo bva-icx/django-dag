@@ -13,17 +13,19 @@ from django_dag.exceptions import NodeNotReachableException
 class NodeStorage():
     pass
 
-class DagOrderindBasicTests(TestCase):
+class DagOrderingBasicTests(TestCase):
     def setUp(self):
         self.nodes_eo = NodeStorage()
         for i in range(1, 10):
-            EdgeOrderedNode(name="%s" % i).save()
-            setattr(self.nodes_eo, "p%s" % i, EdgeOrderedNode.objects.get(pk=i))
+            n = EdgeOrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes_eo, "p%s" % i, n)
 
         self.nodes_no = NodeStorage()
         for i in range(1, 10):
-            EdgeOrderedNode(name="%s" % i).save()
-            setattr(self.nodes_no, "p%s" % i, EdgeOrderedNode.objects.get(pk=i))
+            e = EdgeOrderedNode(name="%s" % i)
+            e.save()
+            setattr(self.nodes_no, "p%s" % i, e)
 
     def test_can_add_a_child_with_edge_order(self):
         self.nodes_eo.p1.add_child(self.nodes_eo.p5, sequence=12)
@@ -34,10 +36,10 @@ class DagOrderindBasicTests(TestCase):
         self.nodes_eo.p2.add_child(self.nodes_eo.p7, sequence=5)
         self.assertEqual(OrderedEdge.objects.all().count(), 6)
         self.assertEqual(
-            list(OrderedEdge.objects.all().order_by('parent_id','child_id').values_list(
-                'parent_id','child_id','sequence')
+            list(OrderedEdge.objects.all().order_by('parent__name','child__name').values_list(
+                'parent__name','child__name','sequence')
             ),
-            [(1, 5, 12), (1, 6, 8), (1, 7, 4), (2, 5, 1), (2, 6, 7), (2, 7, 5)])
+            [('1', '5', 12), ('1', '6', 8), ('1', '7', 4), ('2', '5', 1), ('2', '6', 7), ('2', '7', 5)])
 
     def test_can_add_a_child_with_overlapping_edge_orders(self):
         self.nodes_eo.p1.add_child(self.nodes_eo.p5, sequence=12)
@@ -46,10 +48,10 @@ class DagOrderindBasicTests(TestCase):
         self.nodes_eo.p2.add_child(self.nodes_eo.p6, sequence=12)
         self.assertEqual(OrderedEdge.objects.all().count(), 4)
         self.assertEqual(
-            list(OrderedEdge.objects.all().order_by('parent_id','child_id').values_list(
-                'parent_id','child_id','sequence')
+            list(OrderedEdge.objects.all().order_by('parent__name','child__name').values_list(
+                'parent__name','child__name','sequence')
             ),
-            [(1, 5, 12), (1, 6, 8), (2, 5, 8), (2, 6, 12)])
+            [('1', '5', 12), ('1', '6', 8), ('2', '5', 8), ('2', '6', 12)])
 
     @unittest.skip('No support for add_child setting sequence on node')
     def test_can_add_a_child_with_node_order(self):
@@ -66,10 +68,10 @@ class DagOrderindBasicTests(TestCase):
 
         self.assertEqual(OrderedEdge.objects.all().count(), 6)
         self.assertEqual(
-            list(OrderedEdge.objects.all().order_by('parent_id','child_id').values_list(
-                'parent_id','child_id','sequence')
+            list(OrderedEdge.objects.all().order_by('parent__name','child__name').values_list(
+                'parent__name','child__name','sequence')
             ),
-            [(1, 5, 54), (1, 6, 8), (1, 7, 4), (2, 5, 1), (2, 6, 7), (2, 7, 5)])
+            [('1', '5', 54), ('1', '6', 8), ('1', '7', 4), ('2', '5', 1), ('2', '6', 7), ('2', '7', 5)])
 
     def test_can_use_node_insert_before_at_start_uses_key_next(self):
         self.nodes_eo.p1.add_child(self.nodes_eo.p5, sequence=12)
@@ -82,10 +84,10 @@ class DagOrderindBasicTests(TestCase):
 
         self.assertEqual(OrderedEdge.objects.all().count(), 6)
         self.assertEqual(
-            list(OrderedEdge.objects.all().order_by('parent_id','child_id').values_list(
-                'parent_id','child_id','sequence')
+            list(OrderedEdge.objects.all().order_by('parent__name','child__name').values_list(
+                'parent__name','child__name','sequence')
             ),
-            [(1, 5, 12), (1, 6, 8), (1, 7, 4), (2, 5, 1), (2, 6, 7), (2, 7, 5)])
+            [('1', '5', 12), ('1', '6', 8), ('1', '7', 4), ('2', '5', 1), ('2', '6', 7), ('2', '7', 5)])
 
     @unittest.skip('no exception or test written as yet')
     def test_can_use_node_insert_after_can_cause_renumbering(self):
@@ -110,10 +112,10 @@ class DagOrderindBasicTests(TestCase):
 
         self.assertEqual(OrderedEdge.objects.all().count(), 6)
         self.assertEqual(
-            list(OrderedEdge.objects.all().order_by('parent_id','child_id').values_list(
-                'parent_id','child_id','sequence')
+            list(OrderedEdge.objects.all().order_by('parent__name','child__name').values_list(
+                'parent__name','child__name','sequence')
             ),
-            [(1, 5, 12), (1, 6, 8), (1, 7, 4), (2, 5, 1), (2, 6, 7), (2, 7, 5)])
+            [('1', '5', 12), ('1', '6', 8), ('1', '7', 4), ('2', '5', 1), ('2', '6', 7), ('2', '7', 5)])
 
     def test_can_use_node_insert_before_uses_key_between(self):
         self.nodes_eo.p1.add_child(self.nodes_eo.p5, sequence=12)
@@ -126,17 +128,18 @@ class DagOrderindBasicTests(TestCase):
 
         self.assertEqual(OrderedEdge.objects.all().count(), 6)
         self.assertEqual(
-            list(OrderedEdge.objects.all().order_by('parent_id','child_id').values_list(
-                'parent_id','child_id','sequence')
+            list(OrderedEdge.objects.all().order_by('parent__name','child__name').values_list(
+                'parent__name','child__name','sequence')
             ),
-            [(1, 5, 12), (1, 6, 8), (1, 7, 4), (2, 5, 1), (2, 6, 7), (2, 7, 5)])
+            [('1', '5', 12), ('1', '6', 8), ('1', '7', 4), ('2', '5', 1), ('2', '6', 7), ('2', '7', 5)])
 
 class EdgeSortedDagRelationshipTests(TestCase):
     def setUp(self):
         self.nodes = NodeStorage()
         for i in range(1, 10):
-            EdgeOrderedNode(name="%s" % i).save()
-            setattr(self.nodes, "p%s" % i, EdgeOrderedNode.objects.get(pk=i))
+            e = EdgeOrderedNode(name="%s" % i)
+            e.save()
+            setattr(self.nodes, "p%s" % i, e)
         # `-- <BasicNode: # 1>
         #     `--  4 -- <BasicNode: # 7 o1>
         #     `--  8 -- <BasicNode: # 6 o2>
@@ -156,12 +159,12 @@ class EdgeSortedDagRelationshipTests(TestCase):
     def test_children_ordered_filter(self):
         self.assertEqual(
             list(self.nodes.p1.children \
-                    .with_sequence().order_by('sequence').values_list('pk', 'sequence')),
-            [(7,4), (6,8), (5,12)])
+                    .with_sequence().order_by('sequence').values_list('name', 'sequence')),
+            [('7',4), ('6',8), ('5',12)])
         self.assertEqual(
             list(self.nodes.p2.children \
-                    .with_sequence().order_by('sequence').values_list('pk', 'sequence')),
-            [(5,1), (7,4), (6,8)])
+                    .with_sequence().order_by('sequence').values_list('name', 'sequence')),
+            [('5',1), ('7',4), ('6',8)])
 
     @unittest.skip('no exception or test written as yet')
     def test_handle_ordered_filter_on_node_as_invalid(self):
@@ -170,15 +173,15 @@ class EdgeSortedDagRelationshipTests(TestCase):
     def test_parent_ordered_filter(self):
         self.assertEqual(
             list(self.nodes.p5.parents \
-                    .with_sequence().order_by('sequence').values_list('pk', 'sequence')),
-            [(2,1), (1,12)])
+                    .with_sequence().order_by('sequence').values_list('name', 'sequence')),
+            [('2',1), ('1',12)])
 
 
     def test_parent_ordered_filter_alternatename(self):
         self.assertEqual(
             list(self.nodes.p5.parents \
-                    .with_sequence('alternate').order_by('alternate').values_list('pk', 'alternate')),
-            [(2,1), (1,12)])
+                    .with_sequence('alternate').order_by('alternate').values_list('name', 'alternate')),
+            [('2',1), ('1',12)])
 
 
     def test_can_get_first_child_of_node(self):
@@ -263,8 +266,9 @@ class NodeSortedDagRelationshipTests(TestCase):
     def setUp(self):
         self.nodes = NodeStorage()
         for i in range(1, 10):
-            OrderedNode(name="%s" % i).save()
-            setattr(self.nodes, "p%s" % i, OrderedNode.objects.get(pk=i))
+            n = OrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
         # `-- <BasicNode: # 1>
         #     `-- <BasicNode: # 5 o=1 go=2 >
         #     `-- <BasicNode: # 4 o=2 go=3 >
@@ -294,20 +298,20 @@ class NodeSortedDagRelationshipTests(TestCase):
         self.assertEqual(
             list(self.nodes.p1.children \
                     .with_sequence().order_by('sequence') \
-                    .values_list('pk', 'sequence')),
-            [(5, 2), (4, 6), (3, 12)])
+                    .values_list('name', 'sequence')),
+            [('5', 2), ('4', 6), ('3', 12)])
         self.assertEqual(
             list(self.nodes.p2.children \
                     .with_sequence().order_by('sequence') \
-                    .values_list('pk', 'sequence')),
-            [(6, 1), (8, 8), (7, 11)])
+                    .values_list('name', 'sequence')),
+            [('6', 1), ('8', 8), ('7', 11)])
 
     def test_ordered_filter_on_node(self):
         self.assertEqual(
             list(OrderedNode.objects \
                     .with_sequence().order_by('sequence') \
-                    .filter(sequence__gt=0).values_list('pk', 'sequence')),
-            [(6, 1), (5, 2), (4, 6), (8, 8), (7, 11), (3, 12)])
+                    .filter(sequence__gt=0).values_list('name', 'sequence')),
+            [('6', 1), ('5', 2), ('4', 6), ('8', 8), ('7', 11), ('3', 12)])
 
     def test_can_get_first_child_of_node(self):
         self.assertEqual(self.nodes.p1.get_first_child(), self.nodes.p5)
