@@ -169,8 +169,12 @@ def node_manager_factory(base_manager_class, ordering=None, ):
             if isinstance(order_query, F):
                 if order_query.name == fieldname:
                     # We are ordering by an field on the primary model
-                    return self.get_queryset().order_by(fieldname)
+                    # so this is the null actions as that fields is already
+                    # available for order by
+                    return self.get_queryset()
 
+            # elsewise add the computed sequence values as an
+            # annotation for future order_by() effects.
             return self.get_queryset().annotate(
                 **{fieldname: order_query}
             )
