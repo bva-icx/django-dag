@@ -149,6 +149,9 @@ def node_manager_factory(base_manager_class, ordering=None, ):
                 # If we don't haave a target_field_name we are probably not a related
                 # manager so we can not order by
                 if getattr(self.model, sequence_field_name , None) is None:
+                    ### FIXME - Instead of getting here we shoudl raise a check modle constriant
+                    raise NoOrderRelationDefined("You cannot order if you don't know what to order by")
+                    #return self
                     # FIXME: Decide how to manage assert below
                     assert False, "You cannot order if you don't know what to order by"
                     return self
