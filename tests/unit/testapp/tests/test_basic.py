@@ -248,6 +248,8 @@ class DagRelationshipTests(TestCase):
             'test_name')
 
 class DagStructureTests(TestCase):
+    nodeToTest= BasicNode
+    edgeToTest = BasicEdge
     def setUp(self,):
         self.nodes = NodeStorage()
         for i in range(1, 12):
@@ -424,12 +426,12 @@ class DagStructureTests(TestCase):
 
     def test_can_remove_leaf_child(self):
         """Test we can remove a leaf child node"""
-        self.assertTrue(BasicEdge.objects.filter(
+        self.assertTrue(self.edgeToTest.objects.filter(
             parent=self.nodes.p9,
             child=self.nodes.p10
             ).exists())
         self.nodes.p10.remove_parent(self.nodes.p9)
-        self.assertFalse(BasicEdge.objects.filter(
+        self.assertFalse(self.edgeToTest.objects.filter(
             parent=self.nodes.p9,
             child=self.nodes.p10
             ).exists())
@@ -437,12 +439,12 @@ class DagStructureTests(TestCase):
 
     def test_can_remove_root_child(self):
         """Test we can remove a leaf child node"""
-        self.assertTrue(BasicEdge.objects.filter(
+        self.assertTrue(self.edgeToTest.objects.filter(
             parent=self.nodes.p1,
             child=self.nodes.p5
             ).exists())
         self.nodes.p5.remove_parent(self.nodes.p1)
-        self.assertFalse(BasicEdge.objects.filter(
+        self.assertFalse(self.edgeToTest.objects.filter(
             parent=self.nodes.p1,
             child=self.nodes.p5
             ).exists())
@@ -452,12 +454,12 @@ class DagStructureTests(TestCase):
 
     def test_can_remove_mid_child(self):
         """Test we can remove a leaf child node"""
-        self.assertTrue(BasicEdge.objects.filter(
+        self.assertTrue(self.edgeToTest.objects.filter(
             parent=self.nodes.p6,
             child=self.nodes.p9
             ).exists())
         self.nodes.p9.remove_parent(self.nodes.p6)
-        self.assertFalse(BasicEdge.objects.filter(
+        self.assertFalse(self.edgeToTest.objects.filter(
             parent=self.nodes.p6,
             child=self.nodes.p9
             ).exists())
@@ -531,7 +533,7 @@ class DagStructureTests(TestCase):
 
     def test_dag_tree_render(self):
         # Testing the view
-        response = render_to_response('tree.html', { 'dag_list': BasicNode.objects.all()})
+        response = render_to_response('tree.html', { 'dag_list': self.nodeToTest.objects.all()})
         self.assertEqual(response.content.decode('utf-8'), expected_tree_output)
 
     @unittest.skip('todo')
