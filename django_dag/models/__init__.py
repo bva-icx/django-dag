@@ -40,7 +40,7 @@ def _get_base_manager(base_model, base_merge_manager):
     if _default_manager:
         _default_manager_class = base_model._default_manager.__class__
 
-    if not  _default_manager_class:
+    if not _default_manager_class:
         # No default manager use base_merge_manager
         return base_merge_manager
 
@@ -147,12 +147,11 @@ def node_manager_factory(base_manager_class, ordering=None, ):
             sequence_field_name = self.sequence_manager.sequence_field_name
             fieldname = fieldname or self.sequence_manager.sequence_field_name
             if not hasattr(self, 'target_field_name'):
-                # If we don't haave a target_field_name we are probably not a related
+                # If we don't have a target_field_name we are probably not a related
                 # manager so we can not order by
                 if getattr(self.model, sequence_field_name , None) is None:
-                    ### FIXME - Instead of getting here we shoudl raise a check modle constriant
+                    ### FIXME - Instead of getting here we should raise a check model constraint
                     raise NoOrderRelationDefined("You cannot order if you don't know what to order by")
-                    #return self
                     # FIXME: Decide how to manage assert below
                     assert False, "You cannot order if you don't know what to order by"
                     return self

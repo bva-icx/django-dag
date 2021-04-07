@@ -40,10 +40,6 @@ class DagStructureTestsConcreteInherited(DagStructureTests):
         self.build_structure()
 
 
-    def test_creation(self,):
-        pass
-
-
 @unittest.skip("Most of these fail because the tree walker returns the basenode")
 class DagStructureTestsDerivedA(DagStructureTests):
     nodeToTest = DerivedNodeA
@@ -54,6 +50,7 @@ class DagStructureTestsDerivedA(DagStructureTests):
             n = DerivedNodeA(name="%s" % i)
             n.save()
             setattr(self.nodes, "p%s" % i,n)
+
 
 class DagStructureTestsDerivedMultiNode(TestCase):
     def setUp(self,):

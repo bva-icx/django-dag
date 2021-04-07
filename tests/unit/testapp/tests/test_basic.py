@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from .tree_test_output import expected_tree_output
 from ..models.basic import BasicNode, BasicEdge, BasicNodeES, BasicEdgeES
 from django_dag.exceptions import NodeNotReachableException
-from django_dag.models import node_factory,_get_base_manager,  node_manager_factory,BaseNodeManager
+from django_dag.models import node_factory, _get_base_manager, node_manager_factory, BaseNodeManager
 from django.db import models
 
 class NodeStorage():
@@ -28,14 +28,12 @@ class DagTestCase(TestCase):
         self.assertTrue(issubclass(manager,UnrelatedManager))
         self.assertTrue(issubclass(manager,BaseNodeManager))
 
-    def test_node_factory_repects_base_classes(self,):
-
-        #
+    def test_node_factory_respects_base_classes(self,):
         # This test checks for early failure in djangocte
-        # style models.in those cases at the momeent you
+        # style models. In those cases at the moment you
         # need to make sure that the QS/ manager derives from
         # the CTE version if you override them. This isn't
-        # needed inthe std version, so the API is not orthogonal.(FIXME)
+        # needed in the std version, so the API is not orthogonal.(FIXME)
         if not hasattr(settings,'DJANGO_DAG_BACKEND') or not settings.DJANGO_DAG_BACKEND.endswith('djangocte'):
             return
 
@@ -54,12 +52,11 @@ class DagTestCase(TestCase):
         #self.assertTrue(issubclass(MyModel,models.Model))
         #self.assertTrue(issubclass(dagmodel,MyModel))
         #self.assertTrue(isinstance(dagmodel.objects,MyManager))
-#        #self.assertTrue(isinstance(dagmodel.objects.get_queryset(),MyQS))
+        #self.assertTrue(isinstance(dagmodel.objects.get_queryset(),MyQS))
 
     def test_objects_were_created(self):
         for i in range(1, 11):
             self.assertEqual(BasicNode.objects.get(name="%s" % i).name, "%s" % i)
-
 
     def test_deep_dag(self):
         """
@@ -323,14 +320,13 @@ class DagStructureTests(TestCase):
         self.assertEqual(self.expand_path(self.nodes.p4.get_paths(self.nodes.p10)), [['6', '9', '10']])
         self.assertEqual(self.expand_path(self.nodes.p3.get_paths(self.nodes.p10)), [['4', '6', '9', '10']])
 
-    
     def test_paths_Edge_options_with_duplicate_edge(self,):
         self.nodes.p2.add_child(self.nodes.p11)
         self.nodes.p2.add_child(self.nodes.p11)
         paths = self.nodes.p2.get_paths(self.nodes.p11,use_edges=True)
 
         def check_path(p):
-            """check a returned path is waht we expect"""
+            """check a returned path is what we expect"""
             self.assertEqual(len(p),1)
             self.assertEqual(p[0].parent,self.nodes.p2)
             self.assertEqual(p[0].child,self.nodes.p11)
@@ -350,7 +346,6 @@ class DagStructureTests(TestCase):
         self.assertEqual(len(paths),1)
         self.assertEqual(len(paths[0]),1)
         self.assertEqual(paths[0][0],self.nodes.p11)
-
 
     def test_path_raise_for_unattached_nodes(self,):
         with self.assertRaises(NodeNotReachableException) as add_err_cm:
@@ -414,7 +409,6 @@ class DagStructureTests(TestCase):
         lonelynode.save()
         self.assertEqual([p.name for p in lonelynode.get_leaves()], ['lonely'])
         self.assertEqual([p.name for p in lonelynode.get_roots()], ['lonely'])
-
 
     def test_node_know_if_it_a_root_or_leaf_node(self,):
         self.assertTrue(self.nodes.p1.is_root)
@@ -504,7 +498,6 @@ class DagStructureTests(TestCase):
         # Note: What ordering promises fo we make?
         pass
 
-
     def test_can_find_clan(self):
         self.assertEqual(
             sorted([p.name for p in self.nodes.p5.clan], key=int),
@@ -529,7 +522,6 @@ class DagStructureTests(TestCase):
                 self.nodes.p9.pk,
                 self.nodes.p10.pk
             ])
-
 
     def test_dag_tree_render(self):
         # Testing the view

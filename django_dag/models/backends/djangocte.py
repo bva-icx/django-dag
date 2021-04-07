@@ -153,8 +153,6 @@ class ProtoNode(BaseNode):
             .order_by('id')
         return datarows
 
-
-
     def make_path_cte_fn(self, field_name, source, target):
         return source.make_path_src_cte_fn(field_name, target)
 
@@ -169,7 +167,6 @@ class ProtoNode(BaseNode):
                             'depth':cte.col.depth + Value(1, output_field=models.IntegerField())
                             }
         )
-
 
     def get_paths(self, target, use_edges=False, downwards=None):
         try:
