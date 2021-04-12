@@ -14,3 +14,7 @@ class InvalidNodeInsert (Exception):
 class NodeSequenceExhaustion (Exception):
     """The gap between to node is to small to generate an intermediate value"""
     pass
+
+class NoOrderRelationDefined (Exception):
+    """"""
+    pass
