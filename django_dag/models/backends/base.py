@@ -53,22 +53,22 @@ class BaseNode(object):
     @property
     def is_root(self):
         """
-        Check if has children and not ancestors
+        Check if node has no ancestors
 
         :rtype: boolean
         :return: True is the node is at the top of the DAG
         """
-        return bool(self.children.exists() and not self.parents.exists())
+        return not self.parents.exists()
 
     @property
     def is_leaf(self):
         """
-        Check if has ancestors and not children
+        Check if the node has not children
 
         :rtype: boolean
         :return: True is the node is at the bottom of the DAG
         """
-        return bool(self.parents.exists() and not self.children.exists())
+        return not self.children.exists()
 
     @property
     def is_island(self):

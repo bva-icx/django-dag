@@ -418,6 +418,10 @@ class DagStructureTests(TestCase):
         self.assertFalse(self.nodes.p6.is_leaf)
         self.assertFalse(self.nodes.p6.is_root)
 
+    def test_node_island_also_leaf_and_root(self,):
+        self.assertTrue(self.nodes.p11.is_leaf)
+        self.assertTrue(self.nodes.p11.is_root)
+
     def test_can_remove_leaf_child(self):
         """Test we can remove a leaf child node"""
         self.assertTrue(self.edgeToTest.objects.filter(
