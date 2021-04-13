@@ -3,7 +3,7 @@
 import os
 from setuptools import setup, find_packages
 
-version = '1.5.0'
+version = '2.0.0'
 
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -38,8 +38,7 @@ setup_args=dict(
     license='GNU Affero General Public License v3',
     packages=find_packages(exclude=['docs']),
     package_dir={'django_dag': 'django_dag'},
-    #package_data={'dag': ['templates/admin/*.html']},
-    description='Directed Acyclic Graph implementation for Django 1.6+',
+    description='Directed Acyclic Graph implementation for Django 2+',
     classifiers=classifiers,
     long_description=long_desc,
     install_requires= install_requires
