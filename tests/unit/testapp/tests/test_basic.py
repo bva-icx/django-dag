@@ -405,7 +405,7 @@ class DagStructureTests(TestCase):
             self.assertEqual([p.name for p in self.nodes.p11.get_leaves()], ['11'])
 
     def test_can_get_root_and_leaf_nodes_on_a_lonely_node(self,):
-        lonelynode = BasicNode(name="lonely")
+        lonelynode = self.nodeToTest(name="lonely")
         lonelynode.save()
         self.assertEqual([p.name for p in lonelynode.get_leaves()], ['lonely'])
         self.assertEqual([p.name for p in lonelynode.get_roots()], ['lonely'])
