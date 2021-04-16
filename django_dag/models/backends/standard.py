@@ -16,7 +16,7 @@ class ProtoNode(BaseNode):
     # Public API
     @property
     def descendants(self):
-            return list(self._get_descendant())
+            return self._convert_to_lazy_node_query(self._get_descendant())
 
     def get_descendant_pks(self):
             return list(self._get_descendant(node_to_cache_attr=lambda x:x.pk))
@@ -39,7 +39,7 @@ class ProtoNode(BaseNode):
 
     @property
     def ancestors(self):
-        return list(self._get_ancestor())
+        return self._convert_to_lazy_node_query(self._get_ancestor())
 
     def get_ancestor_pks(self):
         return list(self._get_ancestor(node_to_cache_attr=lambda x:x.pk))
@@ -131,7 +131,7 @@ class ProtoNode(BaseNode):
         roots = set()
         for a in at:
             roots.update(a._get_roots(at[a]))
-        return roots or set([self])
+        return self._convert_to_lazy_node_query( roots or set([self]))
 
     def _get_roots(self, at):
         """
@@ -149,7 +149,7 @@ class ProtoNode(BaseNode):
         leaves = set()
         for d in dt:
             leaves.update(d._get_leaves(dt[d]))
-        return leaves or set([self])
+        return self._convert_to_lazy_node_query(leaves or set([self]))
 
     def _get_leaves(self, dt):
         """
@@ -179,3 +179,13 @@ class ProtoNode(BaseNode):
         for f in self.parents.all():
             tree[f] = f.get_ancestors_tree()
         return tree
+
+    def _convert_to_lazy_node_query(self, data, query=None):
+        if query is None:
+            fixedquery = self.get_node_model().objects.filter(
+                pk__in = map(lambda x:x.pk , data)
+            )
+        else:
+            fixedquery = query._clone()
+        fixedquery._result_cache = list(data)
+        return fixedquery

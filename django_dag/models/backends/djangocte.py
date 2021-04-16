@@ -51,7 +51,7 @@ class ProtoNode(BaseNode):
 
     @property
     def descendants(self):
-        return [row for row in self._descendants_query()]
+        return self._descendants_query()
 
     def get_descendant_pks(self):
         return [
@@ -70,7 +70,7 @@ class ProtoNode(BaseNode):
 
     @property
     def ancestors(self):
-        return [row for row in self._ancestors_query()]
+        return self._ancestors_query()
 
     def get_ancestor_pks(self):
         return [
@@ -86,6 +86,12 @@ class ProtoNode(BaseNode):
         return cte.join(node_model, id=cte.col.nid) \
             .with_cte(cte).order_by('id', 'depth') \
             .annotate(depth=Max(cte.col.depth))
+
+    @property
+    def clan(self):
+        ancestors=list(self.ancestors.values_list('pk',flat=True))
+        descendants=list(self.descendants.values_list('pk',flat=True))
+        return self.get_node_model().objects.filter(pk__in=[self.pk]+ancestors+descendants)
 
     def _base_tree_cte_builder(self, local_name, link_name, result_spec, recurse_end, recurse_next):
 
@@ -129,7 +135,6 @@ class ProtoNode(BaseNode):
     def _get_source_sink_node(self,remote_name, local_name):
         edge_model = self.get_edge_model()
         node_model = self.get_node_model()
-
         cte = With.recursive(self.make_root_leaf_cte_fn(
             remote_name=remote_name, local_name=local_name
         ))
@@ -149,8 +154,7 @@ class ProtoNode(BaseNode):
                     )
                 ) \
                 .filter(linked=False)
-            ) \
-            .order_by('id')
+            )
         return datarows
 
     def make_path_cte_fn(self, field_name, source, target):

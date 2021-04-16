@@ -141,7 +141,7 @@ class BaseNode(object):
 
     @property
     def clan(self):
-        return self.ancestors + [self, ] + self.descendants
+        return self.ancestors | self.get_node_model().objects.filter(pk=self.pk) | self.descendants
 
     @property
     def ancestors(self):
