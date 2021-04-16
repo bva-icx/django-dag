@@ -17,8 +17,9 @@ backend = import_module(module_name)
 
 BaseNodeManager = backend.ProtoNodeManager
 BaseEdgeManager = backend.ProtoEdgeManager
-BaseNodeQuerySet = backend.ProtoNodeQuerySet
-BaseEdgeQuerySet = backend.ProtoEdgeQuerySet
+
+from .query import BaseNodeQuerySet, BaseEdgeQuerySet
+
 
 __all__ =[
     "edge_manager_factory",

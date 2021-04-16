@@ -404,6 +404,63 @@ class DagStructureTests(TestCase):
             self.assertEqual([p.name for p in self.nodes.p11.get_roots()], ['11'])
             self.assertEqual([p.name for p in self.nodes.p11.get_leaves()], ['11'])
 
+    def test_can_get_roots_nodes_from_queryset(self,):
+        with self.subTest("unfiltered"):
+            self.assertEqual(
+                sorted([p.name for p in self.nodeToTest.objects.roots()], key=int),
+                ['1', '2', '3', '4', '11'])
+        with self.subTest("filtered for node"):
+            self.assertEqual(
+                sorted(
+                    [p.name for p in self.nodeToTest.objects.filter(
+                            pk__in=[
+                                self.nodes.p1.pk,
+                                self.nodes.p2.pk,
+                                self.nodes.p4.pk,
+                                self.nodes.p3.pk,
+                                self.nodes.p10.pk,
+                                self.nodes.p8.pk
+                            ]
+                        ).roots(self.nodes.p5)
+                    ],
+                    key=int),
+                ['1'])
+            self.assertEqual(
+                sorted(
+                    [p.name for p in self.nodeToTest.objects.filter(
+                            pk__in=[
+                                self.nodes.p1.pk,
+                                self.nodes.p2.pk,
+                                self.nodes.p3.pk,
+                                self.nodes.p10.pk,
+                                self.nodes.p8.pk
+                            ]
+                        ).roots(self.nodes.p8)
+                    ],
+                    key=int),
+                ['1', '2'])
+
+    def test_can_get_leaves_nodes_from_queryset(self,):
+        with self.subTest("unfiltered"):
+            self.assertEqual(
+                sorted([p.name for p in self.nodeToTest.objects.leaves()], key=int),
+                ['7', '8', '10', '11'])
+        with self.subTest("filtered for node"):
+            self.assertEqual(
+                sorted(
+                    [p.name for p in self.nodeToTest.objects.filter(
+                            pk__in=[
+                                self.nodes.p3.pk,
+                                self.nodes.p11.pk,
+                                self.nodes.p7.pk,
+                                self.nodes.p10.pk,
+                                self.nodes.p8.pk,
+                            ]
+                        ).leaves(self.nodes.p3)
+                    ],
+                    key=int),
+                ['7','10',])
+
     def test_can_get_root_and_leaf_nodes_on_a_lonely_node(self,):
         lonelynode = self.nodeToTest(name="lonely")
         lonelynode.save()
