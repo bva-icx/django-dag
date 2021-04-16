@@ -42,3 +42,16 @@ Tests
 
 Unit tests can be run with just django installed at the base directory by running
    `python manage.py test`
+
+
+Breaking changes
+................
+   * The name of function Parents remove and parents is now a ManyRelatedManager the same
+     as children.  change parents() to parents.all()
+   * node_set() is now the clan property  (depreciated version available)
+   * descendant_set() is now the descendants property (depreciated version available)
+   * ancestor_set() is now the ancestors property (depreciated version available)
+   * is_leaf, is_island and is_root are all now properties
+   * is_leaf is now true even if the node is an island
+   * is_root is now true even if the node is an island
+   * get_roots, get_leaves now return self id node is an island

@@ -93,6 +93,7 @@ INSTALLED_APPS = (
     # 'django.contrib.admindocs',
 
     'django_dag',
-    'django_dag.tests',
+    'testapp',
+
 )
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
