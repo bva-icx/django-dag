@@ -89,6 +89,7 @@ class ProtoNode(BaseNode):
 
     @property
     def clan(self):
+        # NOTE: This is less then ideall as ATM you cannot join with (or |) cte queries
         ancestors=list(self.ancestors.values_list('pk',flat=True))
         descendants=list(self.descendants.values_list('pk',flat=True))
         return self.get_node_model().objects.filter(pk__in=[self.pk]+ancestors+descendants)
