@@ -250,8 +250,8 @@ class DagStructureTests(TestCase):
     def setUp(self,):
         self.nodes = NodeStorage()
         for i in range(1, 12):
-            BasicNode(name="%s" % i).save()
-            setattr(self.nodes, "p%s" % i, BasicNode.objects.get(pk=i))
+            self.nodeToTest(name="%s" % i).save()
+            setattr(self.nodes, "p%s" % i, self.nodeToTest.objects.get(pk=i))
         self.build_structure()
 
     def build_structure(self,):
