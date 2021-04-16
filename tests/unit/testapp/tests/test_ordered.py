@@ -159,11 +159,13 @@ class EdgeSortedDagRelationshipTests(TestCase):
     def test_children_ordered_filter(self):
         self.assertEqual(
             list(self.nodes.p1.children \
-                    .with_sequence().order_by('sequence').values_list('name', 'sequence')),
+                    .with_sequence().order_by('sequence') \
+                    .values_list('name', 'sequence')),
             [('7',4), ('6',8), ('5',12)])
         self.assertEqual(
             list(self.nodes.p2.children \
-                    .with_sequence().order_by('sequence').values_list('name', 'sequence')),
+                    .with_sequence().order_by('sequence') \
+                    .values_list('name', 'sequence')),
             [('5',1), ('7',4), ('6',8)])
 
     @unittest.skip('no exception or test written as yet')
@@ -173,14 +175,15 @@ class EdgeSortedDagRelationshipTests(TestCase):
     def test_parent_ordered_filter(self):
         self.assertEqual(
             list(self.nodes.p5.parents \
-                    .with_sequence().order_by('sequence').values_list('name', 'sequence')),
+                    .with_sequence().order_by('sequence') \
+                    .values_list('name', 'sequence')),
             [('2',1), ('1',12)])
-
 
     def test_parent_ordered_filter_alternatename(self):
         self.assertEqual(
             list(self.nodes.p5.parents \
-                    .with_sequence('alternate').order_by('alternate').values_list('name', 'alternate')),
+                    .with_sequence(fieldname='alternate').order_by('alternate') \
+                    .values_list('name', 'alternate')),
             [('2',1), ('1',12)])
 
 
