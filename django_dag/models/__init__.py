@@ -179,15 +179,6 @@ def node_manager_factory(base_manager_class, ordering=None, ):
                 **{fieldname: order_query}
             )
 
-        #def get_queryset(self):
-        #    qs = super().get_queryset()
-        #    if not self.sequence_manager:
-        #        return qs
-        #    return qs
-
-    class NodeQuerySet(models.QuerySet):
-        sequence_manager = ordering
-
     return NodeManager
 
 
