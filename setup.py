@@ -25,8 +25,8 @@ def root_dir():
 
 long_desc = open(os.path.join(root_dir(), 'README')).read()
 install_requires = [
-"django==2.2",
-"deprecation"
+    "Django>=2.2",
+    "deprecation"
 ]
 
 setup_args=dict(
