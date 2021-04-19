@@ -3,7 +3,8 @@ from django.core.exceptions import ValidationError
 from django.db.models import Case, When
 from django_dag.exceptions import NodeNotReachableException
 
-from deprecation import deprecated
+from deprecated.sphinx import deprecated
+
 
 class BaseNode(object):
     """
@@ -352,44 +353,28 @@ class BaseNode(object):
         return edge.save()
 
     ################################################################
-    #  Do we want these
-    def descendants_tree(self):
-        raise NotImplementedError()
-
-    def ancestors_tree(self):
-        raise NotImplementedError()
-
-    ################################################################
     # Legacy functions
-    @deprecated()
-    def node_set(self):
-        return self.clan
-
-    @deprecated()
+    @deprecated(version='2.0', reason="Replaced by descendants")
     def descendants_set(self):
         return self.descendants
 
-    @deprecated()
+    @deprecated(version='2.0', reason="Replaced by clan")
     def node_set(self):
         return self.clan
 
-    @deprecated()
-    def descendants_set(self):
-        return self.descendants
-
-    @deprecated()
+    @deprecated(version='2.0', reason="Replaced by ancestors")
     def ancestors_set(self):
         return self.ancestors
 
-    @deprecated()
+    @deprecated(version='2.0')
     def descendants_tree(self):
         return self.get_descendants_tree()
 
-    @deprecated()
+    @deprecated(version='2.0')
     def ancestors_tree(self):
         return self.get_ancestors_tree()
 
-    @deprecated()
+    @deprecated(version='2.0', reason="Replaced by paths as multiple paths are possible")
     def path(self, target):
         """
         The first found path between two nodes that is the shortest
