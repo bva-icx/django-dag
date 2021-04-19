@@ -7,6 +7,7 @@ class BaseNodeQuerySet(backend.ProtoNodeQuerySet):
 
         Returns a queryset of the Root nodes (nodes with no parents) in the
         Node model which are part of the current query.
+
         :param node: If a node instance is specified, further limits to only
             the roots ancestors for that node.
         :return: QuerySet
@@ -21,6 +22,7 @@ class BaseNodeQuerySet(backend.ProtoNodeQuerySet):
 
         Returns a queryset of the Root nodes (nodes with no children) in the
         Node model which are part of the current query.
+
         :param node: If a node instance is specified, further limits to only
             the leaves decendants for that node.
         :return: QuerySet
