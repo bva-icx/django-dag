@@ -3,7 +3,7 @@ import unittest
 from django.conf import settings
 
 from django.test import TestCase
-from django.shortcuts import render_to_response
+from django.shortcuts import render
 from django.core.exceptions import ValidationError
 from .tree_test_output import expected_tree_output
 from ..models.basic import BasicNode, BasicEdge, BasicNodeES, BasicEdgeES
@@ -586,7 +586,7 @@ class DagStructureTests(TestCase):
 
     def test_dag_tree_render(self):
         # Testing the view
-        response = render_to_response('tree.html', { 'dag_list': self.nodeToTest.objects.all()})
+        response = render(None, 'tree.html', { 'dag_list': self.nodeToTest.objects.all()})
         self.assertEqual(response.content.decode('utf-8'), expected_tree_output)
 
     @unittest.skip('todo')
