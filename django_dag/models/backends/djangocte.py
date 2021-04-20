@@ -96,24 +96,24 @@ class ProtoNode(BaseNode):
         descendants=list(self.descendants.values_list('pk',flat=True))
         return self.get_node_model().objects.filter(pk__in=[self.pk]+ancestors+descendants)
 
-    def _base_tree_cte_builder(self, local_name, link_name, result_spec, recurse_end, recurse_next):
+    def _base_tree_cte_builder(self, local_name, link_name, result_spec, recurse_init, recurse_next):
 
         # Since we have a recurse use for CTE, and  tree srutue all our cte's look
         # similar  we walk from localname on across to link name, making a union
         # so the values in results table look similar (result_spec) it jus the 
-        # initial quiery needs to seen some values (recurse_end) and recurse_next
+        # initial quiery needs to seen some values (recurse_init) and recurse_next
         # contains optional calcs.
 
         def cte_builder(cte):
-            recurse_end_values = recurse_end(cte) if callable(recurse_end) else dict(recurse_end)
-            recurse_end_values.update(result_spec)
+            recurse_init_values = recurse_init(cte) if callable(recurse_init) else dict(recurse_init)
+            recurse_init_values.update(result_spec)
 
             recurse_next_values = recurse_next(cte) if callable(recurse_next) else dict(recurse_next)
             recurse_next_values.update(result_spec)
 
             edge_model = self.get_edge_model()
             basic_cte_query = ( edge_model.objects.filter(**{local_name:self.pk})
-                .values( **recurse_end_values)
+                .values( **recurse_init_values)
                 .union(
                     cte.join(edge_model, **{local_name: getattr(cte.col,link_name)})
                     .values(**recurse_next_values)
