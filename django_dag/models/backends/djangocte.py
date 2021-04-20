@@ -65,8 +65,9 @@ class ProtoNode(BaseNode):
             remote_name='child_id', local_name='parent_id'
         ))
         return cte.join(node_model, id=cte.col.nid) \
-            .with_cte(cte).order_by('id', 'depth') \
-            .annotate(depth=Max(cte.col.depth))
+            .with_cte(cte) \
+            .annotate(depth=Max(cte.col.depth)) \
+            .order_by('id', 'depth')
 
     @property
     def ancestors(self):
@@ -84,8 +85,9 @@ class ProtoNode(BaseNode):
             remote_name='parent_id', local_name='child_id'
         ))
         return cte.join(node_model, id=cte.col.nid) \
-            .with_cte(cte).order_by('id', 'depth') \
-            .annotate(depth=Max(cte.col.depth))
+            .with_cte(cte)\
+            .annotate(depth=Max(cte.col.depth)) \
+            .order_by('id', 'depth') 
 
     @property
     def clan(self):
