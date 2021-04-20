@@ -60,21 +60,17 @@ class RecurseDictNode(template.Node):
         return output
 
 
+@register.tag('recursedict')
 def recursedict_tag(parser, token):
     bits = list(token.split_contents())
     if len(bits) != 2 and bits[0] != 'recursedict':
         raise template.TemplateSyntaxError("Invalid tag syntax expected '{% recursedict [dictVar] %}'")
-
-    var = parser.compile_filter(bits[1])
+    sequence = parser.compile_filter(bits[1])
     nodeList = {}
     while len(nodeList) < 4:
-        temp = parser.parse(('value','loop','endloop','endrecursedict'))
-        tag = parser.tokens[0].contents
-        nodeList[tag] = temp
-        parser.delete_first_token()
-        if tag == 'endrecursedict':
+        nodelist_loop = parser.parse(('value','loop','endloop','endrecursedict'))
+        token = parser.next_token()
+        nodeList[token.contents] = nodelist_loop
+        if token.contents == 'endrecursedict':
             break
-
-    return RecurseDictNode(var, nodeList)
-
-recursedict_tag = register.tag('recursedict', recursedict_tag)
+    return RecurseDictNode(sequence, nodeList)
