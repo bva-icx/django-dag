@@ -1,8 +1,10 @@
 from django.db import models, connection
 from django.core.exceptions import ValidationError
 from django.db.models.functions import (
+    Cast,
     Concat,
     Left,
+    LPad,
     StrIndex,
     Substr,
     RowNumber
@@ -37,8 +39,56 @@ class CTEManager(models.Manager):
 
 ProtoNodeManager = CTEManager
 ProtoEdgeManager = CTEManager
-ProtoNodeQuerySet = CTEQuerySet
 ProtoEdgeQuerySet = CTEQuerySet
+
+_PATH_PADDING_SIZE = 4
+
+class ProtoNodeQuerySet(CTEQuerySet):
+    padsize = _PATH_PADDING_SIZE
+
+    def _LPad(self, value):
+        return LPad(
+            Cast(value, output_field=models.TextField()),
+            self.padsize, Value('0'))
+
+    def _depth_first_cte(self, padsize=_PATH_PADDING_SIZE):
+        self.padsize = padsize
+        node_model = self.model
+        edge_model = self.model.get_edge_model()
+        result_model = edge_model
+        element = 'child_id'
+        node_paths_cte = With.recursive(
+            self._make_path_src_cte_fn(
+                element, node_model, self.roots()),
+            name = 'nodePaths'
+        )
+        roots = self.roots() \
+            .annotate(path=self._LPad(F('id')))
+        subnodes = node_paths_cte.join(
+                node_model,
+                id=node_paths_cte.col.cid,
+            ) \
+            .with_cte(node_paths_cte) \
+            .annotate(path=node_paths_cte.col.path)
+
+        return subnodes.union(roots)
+
+    def _make_path_src_cte_fn(self, field_name, model, values):
+        return model._base_tree_cte_builder(
+                'parent_id','cid',
+                {'eid': F('id'), 'cid':F('child_id'), 'pid':F('parent_id'),},
+                {
+                    'path': Concat(self._LPad(F('parent_id')),  Value(","), self._LPad(F('child_id'))),
+                    'depth':Value(1, output_field=models.IntegerField())
+                },
+                (lambda cte: {'path': Concat(
+                                cte.col.path, Value(","), self._LPad(F(field_name)),
+                                output_field=models.TextField(),),
+                            'depth':cte.col.depth + Value(1, output_field=models.IntegerField())
+                            }),
+                {'parent__in': values}
+        )
+
 
 class ProtoNode(BaseNode):
     def make_related_cte_fn(self, remote_name, local_name):

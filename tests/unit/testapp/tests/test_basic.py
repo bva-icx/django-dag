@@ -1,7 +1,8 @@
 import multiprocessing
 import unittest
-from django.conf import settings
+import functools
 
+from django.conf import settings
 from django.test import TestCase
 from django.shortcuts import render
 from django.core.exceptions import ValidationError
@@ -10,6 +11,11 @@ from ..models.basic import BasicNode, BasicEdge, BasicNodeES, BasicEdgeES
 from django_dag.exceptions import NodeNotReachableException
 from django_dag.models import node_factory, _get_base_manager, node_manager_factory, BaseNodeManager
 from django.db import models
+
+DJANGO_DAG_BACKEND = None
+if hasattr(settings,'DJANGO_DAG_BACKEND'):
+    DJANGO_DAG_BACKEND = settings.DJANGO_DAG_BACKEND
+
 
 class NodeStorage():
     pass
@@ -596,3 +602,95 @@ class DagStructureTests(TestCase):
     @unittest.skip('todo')
     def test_cannot_move_a_node_between_parents_causing_circular_ref():
         pass
+
+
+@unittest.skipUnless(
+    DJANGO_DAG_BACKEND == 'django_dag.models.backends.cte',
+    "CTE test only atm"
+    )
+class NodeCoreSortRelationshipTests(TestCase):
+
+    def setUp(self):
+        self.nodes = NodeStorage()
+        for i in range(1, 10):
+            n = BasicNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        # `-- <BasicNode: # 1>
+        #     `-- <BasicNode: # 3 >
+        #     `-- <BasicNode: # 4 >
+        #     `-- <BasicNode: # 5 >
+        # `-- <BasicNode: # 2>
+        #     `-- <BasicNode: # 6 >
+        #     `-- <BasicNode: # 8 >
+        #     `-- <BasicNode: # 7 >
+        self.nodes.p1.add_child(self.nodes.p3)
+        self.nodes.p1.add_child(self.nodes.p4)
+        self.nodes.p1.add_child(self.nodes.p5)
+        self.nodes.p2.add_child(self.nodes.p6)
+        self.nodes.p2.add_child(self.nodes.p7)
+        self.nodes.p2.add_child(self.nodes.p8)
+        for k, n in self.nodes.__dict__.items():
+            if k.startswith('p'):
+                n.save()
+
+    def test_queryset_sortting_filter(self):
+        for i in range(10, 16):
+            n = BasicNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        self.nodes.p4.add_child(self.nodes.p10)
+        self.nodes.p4.add_child(self.nodes.p11)
+        self.nodes.p10.add_child(self.nodes.p12)
+        self.nodes.p7.add_child(self.nodes.p13)
+
+        with self.subTest(msg = "with no cloned nodes"):
+            qs = BasicNode.objects.all()
+            qs_sorted = qs._depth_first_cte(padsize=2).order_by('path')
+            self.assertEqual(
+                    tuple(qs_sorted.values_list('pk', 'path')),
+                    (
+                        (1, '01'),
+                            (3, '01,03'),
+                            (4, '01,04'),
+                                (10, '01,04,10'),
+                                    (12, '01,04,10,12'),
+                                (11, '01,04,11'),
+                            (5, '01,05'),
+                        (2, '02'),
+                            (6, '02,06'),
+                            (7, '02,07'),
+                                (13, '02,07,13'),
+                            (8, '02,08'),
+                        (9,'09'),
+                        (14,'14'),
+                        (15,'15')
+                    )
+            )
+
+        with self.subTest(msg = "with cloned nodes"):
+            self.nodes.p6.insert_child_after(self.nodes.p10,None)
+            qs = BasicNode.objects.all()
+            qs_sorted = qs._depth_first_cte(padsize=2).order_by('path')
+            self.assertEqual(
+                    tuple(qs_sorted.values_list('pk', 'path')),
+                    (
+                        (1, '01'),
+                            (3, '01,03'),
+                            (4, '01,04'),
+                                (10, '01,04,10'),
+                                    (12, '01,04,10,12'),
+                                (11, '01,04,11'),
+                            (5, '01,05'),
+                        (2, '02'),
+                            (6, '02,06'),
+                                (10, '02,06,10'),
+                                    (12, '02,06,10,12'),
+                            (7, '02,07'),
+                                (13, '02,07,13'),
+                            (8, '02,08'),
+                        (9,'09'),
+                        (14,'14'),
+                        (15,'15')
+                    )
+            )
