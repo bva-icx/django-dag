@@ -165,9 +165,6 @@ class ProtoNode(BaseNode):
             )
         return datarows
 
-    def make_path_cte_fn(self, field_name, source, target):
-        return source.make_path_src_cte_fn(field_name, target)
-
     def make_path_src_cte_fn(self, field_name, target):
         return self._base_tree_cte_builder(
                 'parent_id','cid',
@@ -213,11 +210,7 @@ class ProtoNode(BaseNode):
             element = edge_model._meta.pk.name if use_edges else 'parent_id'
 
         node_paths_cte = With.recursive(
-            self.make_path_cte_fn(
-                field_name=element,
-                source=source,
-                target=target
-            ),
+            source.make_path_src_cte_fn(element, target),
             name = 'nodePaths'
         )
 
