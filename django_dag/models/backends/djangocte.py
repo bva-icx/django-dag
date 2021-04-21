@@ -46,7 +46,8 @@ class ProtoNode(BaseNode):
                 local_name,'nid',
                 {'nid':F(remote_name),},
                 {'depth':Value(1, output_field=models.IntegerField()) },
-                lambda cte: {'depth': cte.col.depth + Value(1, output_field=models.IntegerField()) },
+                (lambda cte: {'depth': cte.col.depth + Value(1, output_field=models.IntegerField()) }),
+                {local_name:self.pk}
         )
 
     @property
@@ -96,8 +97,9 @@ class ProtoNode(BaseNode):
         descendants=list(self.descendants.values_list('pk',flat=True))
         return self.get_node_model().objects.filter(pk__in=[self.pk]+ancestors+descendants)
 
-    def _base_tree_cte_builder(self, local_name, link_name, result_spec,
-                recurse_init_spec, recurse_next_spec):
+    @classmethod
+    def _base_tree_cte_builder(cls, local_name, link_name, result_spec,
+                recurse_init_spec, recurse_next_spec, initial_filter_spec):
 
         # Since we have a recurse use for CTE, and  tree srutue all our cte's look
         # similar  we walk from localname on across to link name, making a union
@@ -112,8 +114,9 @@ class ProtoNode(BaseNode):
             recurse_next_values = recurse_next_spec(cte) if callable(recurse_next_spec) else dict(recurse_next_spec)
             recurse_next_values.update(result_spec)
 
-            edge_model = self.get_edge_model()
-            basic_cte_query = ( edge_model.objects.filter(**{local_name:self.pk})
+            initial_filter = initial_filter_spec(cte) if callable(initial_filter_spec) else dict(initial_filter_spec)
+            edge_model = cls.get_edge_model()
+            basic_cte_query = ( edge_model.objects.filter(**initial_filter)
                 .values( **recurse_init_values)
                 .union(
                     cte.join(edge_model, **{local_name: getattr(cte.col,link_name)})
@@ -129,6 +132,7 @@ class ProtoNode(BaseNode):
                 local_name,'rid',
                 {'rid':F(remote_name),'lid':F(local_name),},
                 {},{},
+                {local_name:self.pk}
         )
     def get_roots(self):
         return self._get_source_sink_node('parent_id', 'child_id')
@@ -169,11 +173,12 @@ class ProtoNode(BaseNode):
                 'parent_id','cid',
                 {'cid':F('child_id'),'pid':F('parent_id'),},
                 {'path':F(field_name),'depth':Value(1, output_field=models.IntegerField())},
-                lambda cte: {'path': Concat(
+                (lambda cte: {'path': Concat(
                                 cte.col.path, Value(","), F(field_name),
                                 output_field=models.TextField(),),
                             'depth':cte.col.depth + Value(1, output_field=models.IntegerField())
-                            }
+                            }),
+                {'parent_id': self.pk}
         )
 
     def get_paths(self, target, use_edges=False, downwards=None):
@@ -257,6 +262,7 @@ class ProtoNode(BaseNode):
             return
         raise NodeNotReachableException()
 
+    @classmethod
     def make_list_items_cte_fn(self, query, filter_fn, list_col):
         def make_list_items_cte(cte):
             basic_cte_query = filter_fn(query)
