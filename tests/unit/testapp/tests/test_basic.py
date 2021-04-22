@@ -604,10 +604,6 @@ class DagStructureTests(TestCase):
         pass
 
 
-@unittest.skipUnless(
-    DJANGO_DAG_BACKEND == 'django_dag.models.backends.cte',
-    "CTE test only atm"
-    )
 class NodeCoreSortRelationshipTests(TestCase):
 
     def setUp(self):
@@ -646,9 +642,9 @@ class NodeCoreSortRelationshipTests(TestCase):
 
         with self.subTest(msg = "with no cloned nodes"):
             qs = BasicNode.objects.all()
-            qs_sorted = qs._depth_first_cte(padsize=2).order_by('path')
+            qs_sorted = qs._depth_first(padsize=2).order_by('dag_depth_first_path')
             self.assertEqual(
-                    tuple(qs_sorted.values_list('pk', 'path')),
+                    tuple(qs_sorted.values_list('pk', 'dag_depth_first_path')),
                     (
                         (1, '01'),
                             (3, '01,03'),
@@ -667,13 +663,12 @@ class NodeCoreSortRelationshipTests(TestCase):
                         (15,'15')
                     )
             )
-
         with self.subTest(msg = "with cloned nodes"):
-            self.nodes.p6.insert_child_after(self.nodes.p10,None)
+            self.nodes.p6.add_child(self.nodes.p10)
             qs = BasicNode.objects.all()
-            qs_sorted = qs._depth_first_cte(padsize=2).order_by('path')
+            qs_sorted = qs._depth_first(padsize=2).order_by('dag_depth_first_path')
             self.assertEqual(
-                    tuple(qs_sorted.values_list('pk', 'path')),
+                    tuple(qs_sorted.values_list('pk', 'dag_depth_first_path')),
                     (
                         (1, '01'),
                             (3, '01,03'),

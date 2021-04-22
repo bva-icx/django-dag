@@ -1,15 +1,151 @@
 import sys
+from collections import defaultdict
 
 from django.db import models
 from django_dag.exceptions import NodeNotReachableException
 from django.db.models.query import QuerySet
+from django.db.models.expressions import (
+    Case,
+    F,
+    Value,
+    When,
+)
+from django.db.models.functions import (
+    Cast,
+    LPad,
+)
 from .base import BaseNode
 
 
 ProtoNodeManager = models.Manager
 ProtoEdgeManager = models.Manager
-ProtoNodeQuerySet = QuerySet
 ProtoEdgeQuerySet = QuerySet
+
+
+_PATH_PADDING_SIZE = 4
+_QUERY_ORDER_FIELDNAME = 'dag_order_sequence'
+
+
+def filter_order_with_annotations(queryset,
+    field_names=[], field_values=[], annotations=[],
+    sequence_name=_QUERY_ORDER_FIELDNAME, offset=0):
+    """
+    Filter a queryset to match a predefined order pattern.
+
+    The constructed query filters the items to those matching the field_values and
+    applied any annotations to the items are required.
+    If the filtered query contains duplicated then a union query is returned.
+
+    if sequence_name is set or left default then this field can be used to order the query
+    so that the result set matches that of the items in field_values.
+
+    :param queryset `<QuerySet>`: The initial queryset to filter
+    :param field_names Iterable<str>: List of filed names to used to identify an
+        element of the resultant query ie ['pk',]
+    :param field_values Iterable<Dict>: List of dicts where the keys/values match the names
+        within the field_names paramater and the value is the condition value.
+        Each element in the list is used to identify 1 item in the resultant query in order.
+    :param annotations Iterable<Dict>: Annotations to be applied to each element.
+        For each element in the list the key/value are used to annotate  1 item in the
+        resultant query. The key value is the annotation name and the value is the value of
+        the items annotation.
+    :param sequence_name str: The name of the sequence field to be applied to the query. This
+        then can be used to order the query if needed.
+        If None then the items are not annotated with there sequence.
+    :param offset int: The orders starting offset default: 0
+    """
+
+    order_case = []
+    annotations_lists = defaultdict(list)
+    used=[]
+    query = queryset.none()
+    filter_condition=defaultdict(list)
+
+    for pos, instance_value in enumerate(field_values):
+        when_condition = {}
+        for fn,fv in zip(field_names, instance_value):
+            when_condition.update({fn: fv,})
+        if when_condition in used:
+            # Start new query and union
+            query = filter_order_with_annotations(
+                queryset,
+                field_names=field_names,
+                field_values=field_values[pos:],
+                annotations=annotations[pos:],
+                offset=pos
+            )
+            break
+        for fn,fv in when_condition.items():
+            filter_condition[f'{fn}__in'].append(fv)
+        for ak, av in annotations[pos].items():
+            anno_when  = when_condition.copy()
+            anno_when.update({'then':av })
+            annotations_lists[ak].append(When(**anno_when))
+        if sequence_name:
+            anno_when  = when_condition.copy()
+            anno_when.update({'then': Cast(Value(pos+offset), output_field=models.IntegerField()) })
+            annotations_lists[sequence_name].append(When(**anno_when))
+        used.append(when_condition.copy())
+        when_condition.update({'then': offset+pos})
+        order_case.append(When(**when_condition))
+
+    annotations_cases = {ak: Case(*av) for ak, av in  annotations_lists.items()}
+    order_by = Case(*order_case)
+    query = query.union(
+            queryset.filter(**filter_condition) \
+            .annotate(**annotations_cases)
+        )
+    return query
+
+
+class ProtoNodeQuerySet(QuerySet):
+    padsize = _PATH_PADDING_SIZE
+
+    def _LPad_sql(self, value):
+        return LPad(
+            Cast(value, output_field=models.TextField()),
+            self.padsize, Value('0'))
+
+    def _LPad_py(self, value):
+        return str(value).zfill(self.padsize)
+
+    def _depth_first(self, padsize=_PATH_PADDING_SIZE):
+        self.padsize = padsize
+        node_model = self.model
+        pks = list(map(lambda x:x.pk , self))
+
+        def child_values(roots, dag_depth_first_path):
+            for f in roots:
+                if not hasattr(f, 'dag_depth_first_path'):
+                    f.dag_depth_first_path = \
+                        dag_depth_first_path + ',' + self._LPad_py(f.id)
+                yield f
+                yield from child_values(
+                    f.children.filter(pk__in = pks),
+                    f.dag_depth_first_path)
+
+        roots = self.roots() \
+            .annotate(dag_depth_first_path=self._LPad_sql(F('id')))
+
+        data = list(child_values(roots, ''))
+        return node_model._convert_to_lazy_node_query(
+            data,
+            filter_order_with_annotations(
+                node_model.objects,
+                field_names=['id'],
+                field_values=[ (d.pk,) for d in data],
+                annotations=[
+                    {
+                        'dag_depth_first_path' : Cast(
+                            Value(d.dag_depth_first_path),
+                            output_field=models.TextField()
+                        )
+                    }
+                    for d in data
+                ],
+            )
+        )
+
 
 class ProtoNode(BaseNode):
     ################################################################
@@ -180,9 +316,10 @@ class ProtoNode(BaseNode):
             tree[f] = f.get_ancestors_tree()
         return tree
 
-    def _convert_to_lazy_node_query(self, data, query=None):
+    @classmethod
+    def _convert_to_lazy_node_query(cls, data, query=None):
         if query is None:
-            fixedquery = self.get_node_model().objects.filter(
+            fixedquery = cls.get_node_model().objects.filter(
                 pk__in = map(lambda x:x.pk , data)
             )
         else:

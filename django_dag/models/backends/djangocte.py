@@ -51,7 +51,7 @@ class ProtoNodeQuerySet(CTEQuerySet):
             Cast(value, output_field=models.TextField()),
             self.padsize, Value('0'))
 
-    def _depth_first_cte(self, padsize=_PATH_PADDING_SIZE):
+    def _depth_first(self, padsize=_PATH_PADDING_SIZE):
         self.padsize = padsize
         node_model = self.model
         edge_model = self.model.get_edge_model()
@@ -63,13 +63,13 @@ class ProtoNodeQuerySet(CTEQuerySet):
             name = 'nodePaths'
         )
         roots = self.roots() \
-            .annotate(path=self._LPad(F('id')))
+            .annotate(dag_depth_first_path=self._LPad(F('id')))
         subnodes = node_paths_cte.join(
                 node_model,
                 id=node_paths_cte.col.cid,
             ) \
             .with_cte(node_paths_cte) \
-            .annotate(path=node_paths_cte.col.path)
+            .annotate(dag_depth_first_path=node_paths_cte.col.path)
 
         return subnodes.union(roots)
 
