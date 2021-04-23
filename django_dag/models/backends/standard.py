@@ -12,6 +12,7 @@ from django.db.models.expressions import (
 )
 from django.db.models.functions import (
     Cast,
+    Concat,
     LPad,
 )
 from .base import BaseNode
@@ -24,6 +25,9 @@ ProtoEdgeQuerySet = QuerySet
 
 _PATH_PADDING_SIZE = 4
 _QUERY_ORDER_FIELDNAME = 'dag_order_sequence'
+
+QUERY_ORDER_FIELDNAME_FORMAT = 'dag_%(name)s_sequence'
+QUERY_PATH_FIELDNAME_FORMAT = 'dag_%(name)s_path'
 
 
 def filter_order_with_annotations(queryset,
@@ -101,33 +105,72 @@ def filter_order_with_annotations(queryset,
 class ProtoNodeQuerySet(QuerySet):
     padsize = _PATH_PADDING_SIZE
 
-    def _LPad_sql(self, value):
+    def _LPad_sql(self, value, padsize):
         return LPad(
             Cast(value, output_field=models.TextField()),
-            self.padsize, Value('0'))
+            padsize, Value('0'))
 
-    def _LPad_py(self, value):
-        return str(value).zfill(self.padsize)
+    def _LPad_py(self, value, padsize):
+        return str(value).zfill(padsize)
 
-    def _depth_first(self, padsize=_PATH_PADDING_SIZE):
-        self.padsize = padsize
+    def with_top_down(self, *args, padsize=_PATH_PADDING_SIZE ,**kwargs):
+        """
+        Generates a query that does a top-to-bottom traversal without regard to any
+        possible (left-to-right) ordering of the nodes
+
+        :param padsize int: Length of the field segment for each node in pits path
+            to it root.
+        """
+        return self._sort_query(*args,
+            padsize=padsize, sort_name='top_down' ,**kwargs)
+
+    def with_depth_first(self, *args, padsize=_PATH_PADDING_SIZE ,**kwargs):
+        """
+        Generates a query that does a depth-first traversal, this account for the nodes
+        sequence ordering (left-to-right) of the nodes.
+
+        :param padsize int: Length of the field segment for each node in pits path
+            to it root.
+        """
+        if self.model.sequence_manager:
+            sequence_field=self.model.sequence_manager \
+                .get_node_rel_sort_query_component(
+                    self.model, 'child', 'parent',
+                    parent_filter_ref=models.OuterRef('path_parent_ref')
+                )
+        return self._sort_query(*args,
+            padsize=padsize, sort_name='depth_first',
+            sequence_field=sequence_field, **kwargs)
+
+
+    def _sort_query(self, *args,
+            sort_name='sort',
+            sequence_field=None,
+            padsize=_PATH_PADDING_SIZE):
+
+        _sequence_field = sequence_field if sequence_field else F('id')
+        path_filedname = QUERY_PATH_FIELDNAME_FORMAT % { 'name': sort_name,}
         node_model = self.model
         pks = list(map(lambda x:x.pk , self))
-
-        def child_values(roots, dag_depth_first_path):
+        def child_values(roots):
             for f in roots:
-                if not hasattr(f, 'dag_depth_first_path'):
-                    f.dag_depth_first_path = \
-                        dag_depth_first_path + ',' + self._LPad_py(f.id)
+                base_path = getattr(f, path_filedname)
                 yield f
                 yield from child_values(
-                    f.children.filter(pk__in = pks),
-                    f.dag_depth_first_path)
+                    f.children.filter(pk__in = pks).annotate(
+                        **{
+                            'path_parent_ref': Value(
+                                int(f.pk), output_field=models.IntegerField()),
+                            path_filedname: Concat(
+                                Value(base_path+","),
+                                self._LPad_sql(_sequence_field, padsize),
+                            ),
+                        }
+                    ))
 
         roots = self.roots() \
-            .annotate(dag_depth_first_path=self._LPad_sql(F('id')))
-
-        data = list(child_values(roots, ''))
+            .annotate(**{path_filedname: self._LPad_sql(F('id'), padsize)})
+        data = list(child_values(roots))
         return node_model._convert_to_lazy_node_query(
             data,
             filter_order_with_annotations(
@@ -136,13 +179,14 @@ class ProtoNodeQuerySet(QuerySet):
                 field_values=[ (d.pk,) for d in data],
                 annotations=[
                     {
-                        'dag_depth_first_path' : Cast(
-                            Value(d.dag_depth_first_path),
+                        path_filedname : Cast(
+                            Value(getattr(d,path_filedname)),
                             output_field=models.TextField()
                         )
                     }
                     for d in data
                 ],
+                sequence_name=None
             )
         )
 

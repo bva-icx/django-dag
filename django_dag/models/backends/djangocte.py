@@ -41,51 +41,95 @@ ProtoNodeManager = CTEManager
 ProtoEdgeManager = CTEManager
 ProtoEdgeQuerySet = CTEQuerySet
 
+QUERY_ORDER_FIELDNAME_FORMAT = 'dag_%(name)s_sequence'
+QUERY_PATH_FIELDNAME_FORMAT = 'dag_%(name)s_path'
 _PATH_PADDING_SIZE = 4
 
 class ProtoNodeQuerySet(CTEQuerySet):
-    padsize = _PATH_PADDING_SIZE
-
-    def _LPad(self, value):
+    def _LPad(self, value, padsize):
         return LPad(
             Cast(value, output_field=models.TextField()),
-            self.padsize, Value('0'))
+            padsize, Value('0'))
 
-    def _depth_first(self, padsize=_PATH_PADDING_SIZE):
-        self.padsize = padsize
+    def with_top_down(self, *args, padsize=_PATH_PADDING_SIZE ,**kwargs):
+        """
+        Generates a query that does a top-to-bottom traversal without regard to any
+        possible (left-to-right) ordering of the nodes
+
+        :param padsize int: Length of the field segment for each node in pits path
+            to it root.
+        """
+        return self._sort_query(*args,
+            padsize=padsize, sort_name='top_down' ,**kwargs)
+
+    def with_depth_first(self, *args, padsize=_PATH_PADDING_SIZE ,**kwargs):
+        """
+        Generates a query that does a depth-first traversal, this account for the nodes
+        sequence ordering (left-to-right) of the nodes.
+
+        :param padsize int: Length of the field segment for each node in pits path
+            to it root.
+        """
+        if self.model.sequence_manager:
+            sequence_field=self.model.sequence_manager \
+                .get_edge_rel_sort_query_component(
+                    self.model, 'child_id', 'parent_id'
+                )
+        return self._sort_query(*args,
+            padsize=padsize, sort_name='depth_first',
+            sequence_field=sequence_field, **kwargs)
+
+    def _sort_query(self, *args, padsize,
+            sort_name='sort', sequence_field=None):
+        path_filedname = QUERY_PATH_FIELDNAME_FORMAT % { 'name': sort_name,}
         node_model = self.model
         edge_model = self.model.get_edge_model()
         result_model = edge_model
-        element = 'child_id'
         node_paths_cte = With.recursive(
             self._make_path_src_cte_fn(
-                element, node_model, self.roots()),
+                node_model, self.roots(),
+                sequence_field if sequence_field else F('child_id'),
+                padsize
+            ),
             name = 'nodePaths'
         )
         roots = self.roots() \
-            .annotate(dag_depth_first_path=self._LPad(F('id')))
+            .annotate(**{path_filedname:self._LPad(F('id'), padsize)})
         subnodes = node_paths_cte.join(
                 node_model,
                 id=node_paths_cte.col.cid,
             ) \
             .with_cte(node_paths_cte) \
-            .annotate(dag_depth_first_path=node_paths_cte.col.path)
-
+            .annotate(**{path_filedname:node_paths_cte.col.path})
         return subnodes.union(roots)
 
-    def _make_path_src_cte_fn(self, field_name, model, values):
+    def _breath_first(self, ):
+        pass
+
+    def _make_path_src_cte_fn(self, model, values, sequence_field, padsize):
         return model._base_tree_cte_builder(
-                'parent_id','cid',
-                {'eid': F('id'), 'cid':F('child_id'), 'pid':F('parent_id'),},
+                'parent_id',
+                'cid',
                 {
-                    'path': Concat(self._LPad(F('parent_id')),  Value(","), self._LPad(F('child_id'))),
+                    'eid': F('id'),
+                    'cid':F('child_id'),
+                    'pid':F('parent_id'),
+                },
+                {
+                    'path': Concat(
+                        self._LPad(F('parent_id'), padsize),
+                        Value(","),
+                        self._LPad(sequence_field, padsize)
+                    ),
                     'depth':Value(1, output_field=models.IntegerField())
                 },
-                (lambda cte: {'path': Concat(
-                                cte.col.path, Value(","), self._LPad(F(field_name)),
+                (lambda cte: {
+                    'path': Concat(
+                                cte.col.path, Value(","), self._LPad(sequence_field, padsize),
                                 output_field=models.TextField(),),
-                            'depth':cte.col.depth + Value(1, output_field=models.IntegerField())
-                            }),
+                    'depth':cte.col.depth + Value(1, output_field=models.IntegerField())
+                    }
+                ),
                 {'parent__in': values}
         )
 

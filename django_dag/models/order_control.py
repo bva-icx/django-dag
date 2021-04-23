@@ -86,7 +86,8 @@ class BaseDagOrderController():
 
     ####################################################################
     # Queries related to a node
-    def get_node_rel_sort_query_component(self, model, target, source):
+    def get_node_rel_sort_query_component(self, model, target, source,
+                parent_filter_ref=None):
         """
         Builds a query component that can be used for sorting a children of
         a dag Node.
@@ -107,7 +108,8 @@ class BaseDagOrderController():
         """
         raise NotImplementedError
 
-    def get_edge_rel_sort_query_component(self, model, target, source):
+    def get_edge_rel_sort_query_component(self, model, target, source,
+                parent_filter_ref=None):
         """
         Builds a query component that can be used for sorting a children of
         a dag Node.
@@ -192,9 +194,13 @@ class BaseDagOrderController():
             else:
                 sequence = self.prev_key(after, parent_node)
 
-        kwargs.update({
-            self.sequence_field_name: sequence
-        })
+        if self.get_edge_sequence_field():
+            kwargs.update({
+                self.sequence_field_name: sequence
+            })
+        else:
+            setattr(descendant, self.sequence_field_name, sequence)
+            descendant.save()
         return parent_node.add_child( descendant, **kwargs)
 
     def insert_child_after(self, descendant, parent_node, before, **kwargs):
@@ -213,10 +219,13 @@ class BaseDagOrderController():
                 sequence =self.key_between(after, before, parent_node)
             else:
                 sequence = self.next_key(before, parent_node)
-
-        kwargs.update({
-            self.sequence_field_name: sequence
-        })
+        if self.get_edge_sequence_field():
+            kwargs.update({
+                self.sequence_field_name: sequence
+            })
+        else:
+            setattr(descendant, self.sequence_field_name, sequence)
+            descendant.save()
         return parent_node.add_child( descendant, **kwargs)
 
     def move_child_before(self, descendant, parent_node, before, **kwargs):
@@ -332,7 +341,8 @@ class BaseDagNodeOrderController(BaseDagOrderController):
         """
         return None
 
-    def get_node_rel_sort_query_component(self, model, targetname, sourcename):
+    def get_node_rel_sort_query_component(self, model, targetname, sourcename,
+                parent_filter_ref=None):
         """
         Builds a query component that can be used for sorting a children of
         a dag Node.
@@ -342,7 +352,8 @@ class BaseDagNodeOrderController(BaseDagOrderController):
         """
         return F(self.sequence_field_name)
 
-    def get_edge_rel_sort_query_component(self, model, targetname, sourcename):
+    def get_edge_rel_sort_query_component(self, model, targetname, sourcename,
+                parent_filter_ref=None):
         """
         Builds a query component that can be used for sorting a children of
         a dag Node.
@@ -406,7 +417,8 @@ class BaseDagEdgeOrderController(BaseDagOrderController):
         """
         return None
 
-    def get_node_rel_sort_query_component(self, model, targetname, sourcename):
+    def get_node_rel_sort_query_component(self, model, targetname, sourcename,
+                parent_filter_ref=None):
         """
         Builds a query component that can be used for sorting a children of
         a dag Node.
@@ -418,8 +430,11 @@ class BaseDagEdgeOrderController(BaseDagOrderController):
         sort_field_name = '_min_{}'.format(self.sequence_field_name)
 
         sequence = model.get_edge_model().objects
-        if isinstance(model, models.Model):
+        if parent_filter_ref:
+            sequence = sequence.filter(**{sourcename:parent_filter_ref})
+        elif isinstance(model, models.Model):
             sequence = sequence.filter(**{sourcename:model})
+
         sequence = sequence.filter(
             **{targetname:OuterRef('pk')}
         ).annotate(
@@ -428,7 +443,8 @@ class BaseDagEdgeOrderController(BaseDagOrderController):
         # WARNING: this is non deterministic as we only use the first!
         return Subquery(sequence.values(sort_field_name)[:1])
 
-    def get_edge_rel_sort_query_component(self, model, targetname, sourcename):
+    def get_edge_rel_sort_query_component(self, model, targetname, sourcename,
+                parent_filter_ref=None):
         """
         Builds a query component that can be used for sorting a children of
         a dag Node.

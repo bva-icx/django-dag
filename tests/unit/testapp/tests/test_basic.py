@@ -9,7 +9,13 @@ from django.core.exceptions import ValidationError
 from .tree_test_output import expected_tree_output
 from ..models.basic import BasicNode, BasicEdge, BasicNodeES, BasicEdgeES
 from django_dag.exceptions import NodeNotReachableException
-from django_dag.models import node_factory, _get_base_manager, node_manager_factory, BaseNodeManager
+from django_dag.models import (
+    node_factory,
+    _get_base_manager,
+    node_manager_factory,
+    BaseNodeManager,
+    DagSortOrder,
+)
 from django.db import models
 
 DJANGO_DAG_BACKEND = None
@@ -642,9 +648,12 @@ class NodeCoreSortRelationshipTests(TestCase):
 
         with self.subTest(msg = "with no cloned nodes"):
             qs = BasicNode.objects.all()
-            qs_sorted = qs._depth_first(padsize=2).order_by('dag_depth_first_path')
+            qs_sorted = qs.with_sort_sequence(
+                DagSortOrder.TOP_DOWN,
+                padsize=2
+                ).order_by('dag_top_down_path')
             self.assertEqual(
-                    tuple(qs_sorted.values_list('pk', 'dag_depth_first_path')),
+                    tuple(qs_sorted.values_list('pk', 'dag_top_down_path')),
                     (
                         (1, '01'),
                             (3, '01,03'),
@@ -666,9 +675,12 @@ class NodeCoreSortRelationshipTests(TestCase):
         with self.subTest(msg = "with cloned nodes"):
             self.nodes.p6.add_child(self.nodes.p10)
             qs = BasicNode.objects.all()
-            qs_sorted = qs._depth_first(padsize=2).order_by('dag_depth_first_path')
+            qs_sorted = qs.with_sort_sequence(
+                DagSortOrder.TOP_DOWN,
+                padsize=2
+                ).order_by('dag_top_down_path')
             self.assertEqual(
-                    tuple(qs_sorted.values_list('pk', 'dag_depth_first_path')),
+                    tuple(qs_sorted.values_list('pk', 'dag_top_down_path')),
                     (
                         (1, '01'),
                             (3, '01,03'),

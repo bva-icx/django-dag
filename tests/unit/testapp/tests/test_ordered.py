@@ -1,6 +1,7 @@
 import multiprocessing
 import unittest
 
+from django.conf import settings
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 from .tree_test_output import expected_tree_output
@@ -8,6 +9,12 @@ from ..models.ordered import EdgeOrderedNode, OrderedEdge
 from ..models.ordered import OrderedNode, NodeOrderedEdge
 
 from django_dag.exceptions import NodeNotReachableException
+from django_dag.models import DagSortOrder
+
+DJANGO_DAG_BACKEND = None
+if hasattr(settings,'DJANGO_DAG_BACKEND'):
+    DJANGO_DAG_BACKEND = settings.DJANGO_DAG_BACKEND
+
 
 class NodeStorage():
     pass
@@ -132,6 +139,7 @@ class DagOrderingBasicTests(TestCase):
             ),
             [('1', '5', 12), ('1', '6', 8), ('1', '7', 4), ('2', '5', 1), ('2', '6', 7), ('2', '7', 5)])
 
+
 class EdgeSortedDagRelationshipTests(TestCase):
     def setUp(self):
         self.nodes = NodeStorage()
@@ -154,6 +162,81 @@ class EdgeSortedDagRelationshipTests(TestCase):
         self.nodes.p2.add_child(self.nodes.p5, sequence=1)
         self.nodes.p2.add_child(self.nodes.p6, sequence=8)
         self.nodes.p2.add_child(self.nodes.p7, sequence=4)
+
+    def test_queryset_sortting_filter(self):
+        for i in range(10, 16):
+            n = EdgeOrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        self.nodes.p6.insert_child_after(self.nodes.p10, None)
+        self.nodes.p6.insert_child_after(self.nodes.p11, self.nodes.p10)
+        self.nodes.p10.insert_child_after(self.nodes.p12,None)
+        self.nodes.p2.remove_child(self.nodes.p6)
+        self.nodes.p2.add_child(self.nodes.p3,sequence=9)
+        self.nodes.p3.add_child(self.nodes.p13,sequence=6)
+
+        with self.subTest(msg = "with no cloned nodes"):
+            qs = EdgeOrderedNode.objects.all()
+            qs_sorted = qs.with_sort_sequence(
+                DagSortOrder.DEPTH_FIRST,
+                padsize=2,
+            ).order_by('dag_depth_first_path')
+            self.assertEqual(
+                    tuple(qs_sorted.values_list('pk', 'dag_depth_first_path')),
+                    (
+                        (1, '01'),
+                            (7, '01,04'),
+                            (6, '01,08'),
+                                (10, '01,08,50'),
+                                    (12, '01,08,50,50'),
+                                (11, '01,08,75'),
+                            (5, '01,12'),
+                        (2, '02'),
+                            (5, '02,01'),
+                            (7, '02,04'),
+                            (3, '02,09'),
+                                (13, '02,09,06'),
+                        (4,'04'),
+                        (8,'08'),
+                        (9,'09'),
+                        (14,'14'),
+                        (15,'15')
+                    )
+            )
+        with self.subTest(msg = "with cloned nodes"):
+            self.nodes.p2.insert_child_after(self.nodes.p6, self.nodes.p5)
+            qs = EdgeOrderedNode.objects.all()
+            qs_sorted = qs.with_sort_sequence(
+                DagSortOrder.DEPTH_FIRST,
+                padsize=2,
+            ).order_by('dag_depth_first_path')
+            self.assertEqual(
+                    tuple(qs_sorted.values_list('pk', 'dag_depth_first_path')),
+                    (
+                        (1, '01'),
+                            (7, '01,04'),
+                            (6, '01,08'),
+                                (10, '01,08,50'),
+                                    (12, '01,08,50,50'),
+                                (11, '01,08,75'),
+                            (5, '01,12'),
+                        (2, '02'),
+                            (5, '02,01'),
+                            (6, '02,02'),
+                                (10, '02,02,50'),
+                                    (12, '02,02,50,50'),
+                                (11, '02,02,75'),
+
+                            (7, '02,04'),
+                            (3, '02,09'),
+                                (13, '02,09,06'),
+                        (4,'04'),
+                        (8,'08'),
+                        (9,'09'),
+                        (14,'14'),
+                        (15,'15')
+                    )
+            )
 
     def test_children_ordered_filter(self):
         self.assertEqual(
@@ -273,12 +356,12 @@ class NodeSortedDagRelationshipTests(TestCase):
             setattr(self.nodes, "p%s" % i, n)
         # `-- <BasicNode: # 1>
         #     `-- <BasicNode: # 5 o=1 go=2 >
-        #     `-- <BasicNode: # 4 o=2 go=3 >
-        #     `-- <BasicNode: # 3 o=3 go=6 >
+        #     `-- <BasicNode: # 4 o=2 go=6 >
+        #     `-- <BasicNode: # 3 o=3 go=12 >
         # `-- <BasicNode: # 2>
         #     `-- <BasicNode: # 6 o=1 go=1 >
-        #     `-- <BasicNode: # 8 o=2 go=4 >
-        #     `-- <BasicNode: # 7 o=3 go=5 >
+        #     `-- <BasicNode: # 8 o=2 go=8 >
+        #     `-- <BasicNode: # 7 o=3 go=11 >
         self.nodes.p1.add_child(self.nodes.p3)
         self.nodes.p1.add_child(self.nodes.p4)
         self.nodes.p1.add_child(self.nodes.p5)
@@ -295,6 +378,72 @@ class NodeSortedDagRelationshipTests(TestCase):
         for k, n in self.nodes.__dict__.items():
             if k.startswith('p'):
                 n.save()
+
+    def test_queryset_sortting_filter(self):
+        for i in range(10, 16):
+            n = OrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        self.nodes.p4.insert_child_after(self.nodes.p10,None)
+        self.nodes.p4.insert_child_after(self.nodes.p11, self.nodes.p10)
+        self.nodes.p10.insert_child_after(self.nodes.p12,None)
+        self.nodes.p7.insert_child_after(self.nodes.p13,None)
+
+        with self.subTest(msg = "with no cloned nodes"):
+            qs = OrderedNode.objects.all()
+            qs_sorted = qs.with_sort_sequence(
+                DagSortOrder.DEPTH_FIRST,
+                padsize=2,
+            ).order_by('dag_depth_first_path')
+            self.assertEqual(
+                    tuple(qs_sorted.values_list('pk', 'dag_depth_first_path')),
+                    (
+                        (1, '01'),
+                            (5, '01,02'),
+                            (4, '01,06'),
+                                (10, '01,06,50'),
+                                    (12, '01,06,50,50'),
+                                (11, '01,06,75'),
+                            (3, '01,12'),
+                        (2, '02'),
+                            (6, '02,01'),
+                            (8, '02,08'),
+                            (7, '02,11'),
+                                (13, '02,11,50'),
+                        (9,'09'),
+                        (14,'14'),
+                        (15,'15')
+                    )
+            )
+        with self.subTest(msg = "with cloned nodes"):
+            self.nodes.p6.insert_child_after(self.nodes.p10,None)
+            qs = OrderedNode.objects.all()
+            qs_sorted = qs.with_sort_sequence(
+                DagSortOrder.DEPTH_FIRST,
+                padsize=2,
+            ).order_by('dag_depth_first_path')
+            self.assertEqual(
+                    tuple(qs_sorted.values_list('pk', 'dag_depth_first_path')),
+                    (
+                        (1, '01'),
+                            (5, '01,02'),
+                            (4, '01,06'),
+                                (10, '01,06,50'),
+                                    (12, '01,06,50,50'),
+                                (11, '01,06,75'),
+                            (3, '01,12'),
+                        (2, '02'),
+                            (6, '02,01'),
+                                (10, '02,01,50'),
+                                    (12, '02,01,50,50'),
+                            (8, '02,08'),
+                            (7, '02,11'),
+                                (13, '02,11,50'),
+                        (9,'09'),
+                        (14,'14'),
+                        (15,'15')
+                    )
+            )
 
     def test_children_ordered_filter(self):
         self.assertEqual(

@@ -18,7 +18,7 @@ backend = import_module(module_name)
 BaseNodeManager = backend.ProtoNodeManager
 BaseEdgeManager = backend.ProtoEdgeManager
 
-from .query import BaseNodeQuerySet, BaseEdgeQuerySet
+from .query import BaseNodeQuerySet, BaseEdgeQuerySet, DagSortOrder
 
 
 __all__ =[
@@ -31,6 +31,7 @@ __all__ =[
     "BaseNodeQuerySet",
     "BaseEdgeQuerySet",
     "BaseDagOrderController",
+    "DagSortOrder",
 ]
 
 
