@@ -43,6 +43,7 @@ ProtoEdgeQuerySet = CTEQuerySet
 
 QUERY_ORDER_FIELDNAME_FORMAT = 'dag_%(name)s_sequence'
 QUERY_PATH_FIELDNAME_FORMAT = 'dag_%(name)s_path'
+QUERY_DEPTH_FIELDNAME = 'dag_depth'
 _PATH_PADDING_SIZE = 4
 
 class ProtoNodeQuerySet(CTEQuerySet):
@@ -93,14 +94,20 @@ class ProtoNodeQuerySet(CTEQuerySet):
             ),
             name = 'nodePaths'
         )
-        roots = self.roots() \
-            .annotate(**{path_filedname:self._LPad(F('id'), padsize)})
         subnodes = node_paths_cte.join(
                 node_model,
                 id=node_paths_cte.col.cid,
             ) \
             .with_cte(node_paths_cte) \
-            .annotate(**{path_filedname:node_paths_cte.col.path})
+            .annotate(**{
+                path_filedname:node_paths_cte.col.path,
+                QUERY_DEPTH_FIELDNAME: node_paths_cte.col.depth,
+            })
+        roots = self.roots() \
+            .annotate(**{
+                path_filedname:self._LPad(F('id'), padsize),
+                QUERY_DEPTH_FIELDNAME: Value(0, output_field=models.IntegerField()),
+            })
         return subnodes.union(roots)
 
     def _breath_first(self, ):

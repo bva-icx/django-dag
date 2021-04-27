@@ -646,7 +646,7 @@ class NodeCoreSortRelationshipTests(TestCase):
         self.nodes.p10.add_child(self.nodes.p12)
         self.nodes.p7.add_child(self.nodes.p13)
 
-        with self.subTest(msg = "with no cloned nodes"):
+        with self.subTest(msg = "with no cloned nodes (path)"):
             qs = BasicNode.objects.all()
             qs_sorted = qs.with_sort_sequence(
                 DagSortOrder.TOP_DOWN,
@@ -672,7 +672,8 @@ class NodeCoreSortRelationshipTests(TestCase):
                         (15,'15')
                     )
             )
-        with self.subTest(msg = "with cloned nodes"):
+
+        with self.subTest(msg = "with cloned nodes (path)"):
             self.nodes.p6.add_child(self.nodes.p10)
             qs = BasicNode.objects.all()
             qs_sorted = qs.with_sort_sequence(
@@ -699,5 +700,29 @@ class NodeCoreSortRelationshipTests(TestCase):
                         (9,'09'),
                         (14,'14'),
                         (15,'15')
+                    )
+            )
+
+        with self.subTest(msg = "depth"):
+            self.assertEqual(
+                    tuple(map( lambda x: (x.pk, x.dag_depth), qs_sorted)),
+                    (
+                        (1, 0),
+                            (3, 1),
+                            (4, 1),
+                                (10, 2),
+                                    (12, 3),
+                                (11, 2),
+                            (5, 1),
+                        (2, 0),
+                            (6, 1),
+                                (10, 2),
+                                    (12, 3),
+                            (7, 1),
+                                (13, 2),
+                            (8, 1),
+                        (9, 0),
+                        (14, 0),
+                        (15, 0)
                     )
             )

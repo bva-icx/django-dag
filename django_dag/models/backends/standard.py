@@ -28,6 +28,7 @@ _QUERY_ORDER_FIELDNAME = 'dag_order_sequence'
 
 QUERY_ORDER_FIELDNAME_FORMAT = 'dag_%(name)s_sequence'
 QUERY_PATH_FIELDNAME_FORMAT = 'dag_%(name)s_path'
+QUERY_DEPTH_FIELDNAME = 'dag_depth'
 
 
 def filter_order_with_annotations(queryset,
@@ -155,6 +156,7 @@ class ProtoNodeQuerySet(QuerySet):
         def child_values(roots):
             for f in roots:
                 base_path = getattr(f, path_filedname)
+                depth = getattr(f, QUERY_DEPTH_FIELDNAME) + 1
                 yield f
                 yield from child_values(
                     f.children.filter(pk__in = pks).annotate(
@@ -165,11 +167,21 @@ class ProtoNodeQuerySet(QuerySet):
                                 Value(base_path+","),
                                 self._LPad_sql(_sequence_field, padsize),
                             ),
+                            QUERY_DEPTH_FIELDNAME: Cast(
+                                Value(depth),
+                                output_field=models.IntegerField()
+                            ),
                         }
                     ))
 
         roots = self.roots() \
-            .annotate(**{path_filedname: self._LPad_sql(F('id'), padsize)})
+            .annotate(**{
+                path_filedname: self._LPad_sql(F('id'), padsize),
+                QUERY_DEPTH_FIELDNAME: Cast(
+                    Value(0),
+                    output_field=models.IntegerField()
+                )
+            })
         data = list(child_values(roots))
         return node_model._convert_to_lazy_node_query(
             data,
@@ -179,10 +191,14 @@ class ProtoNodeQuerySet(QuerySet):
                 field_values=[ (d.pk,) for d in data],
                 annotations=[
                     {
-                        path_filedname : Cast(
+                        path_filedname: Cast(
                             Value(getattr(d,path_filedname)),
                             output_field=models.TextField()
-                        )
+                        ),
+                        QUERY_DEPTH_FIELDNAME: Cast(
+                            Value(getattr(d,QUERY_DEPTH_FIELDNAME)),
+                            output_field=models.IntegerField()
+                        ),
                     }
                     for d in data
                 ],
