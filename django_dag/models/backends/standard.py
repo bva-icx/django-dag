@@ -77,7 +77,8 @@ def filter_order_with_annotations(queryset,
                 field_names=field_names,
                 field_values=field_values[pos:],
                 annotations=annotations[pos:],
-                offset=pos
+                offset=pos,
+                sequence_name=sequence_name
             )
             break
         for fn,fv in when_condition.items():
