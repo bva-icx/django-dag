@@ -33,6 +33,7 @@ QUERY_DEPTH_FIELDNAME = 'dag_depth'
 
 def filter_order_with_annotations(queryset,
     field_names=[], field_values=[], annotations=[],
+    empty_annotations=[],
     sequence_name=_QUERY_ORDER_FIELDNAME, offset=0):
     """
     Filter a queryset to match a predefined order pattern.
@@ -65,7 +66,7 @@ def filter_order_with_annotations(queryset,
     used=[]
     query = queryset.none()
     filter_condition=defaultdict(list)
-
+    pos = None
     for pos, instance_value in enumerate(field_values):
         when_condition = {}
         for fn,fv in zip(field_names, instance_value):
@@ -94,6 +95,9 @@ def filter_order_with_annotations(queryset,
         used.append(when_condition.copy())
         when_condition.update({'then': offset+pos})
         order_case.append(When(**when_condition))
+
+    if pos is None:
+        return query.annotate(**{ name: Value(None, output_field=models.IntegerField()) for name in empty_annotations})
 
     annotations_cases = {ak: Case(*av) for ak, av in  annotations_lists.items()}
     order_by = Case(*order_case)
@@ -203,6 +207,7 @@ class ProtoNodeQuerySet(QuerySet):
                     }
                     for d in data
                 ],
+                empty_annotations=[path_filedname, QUERY_DEPTH_FIELDNAME],
                 sequence_name=None
             )
         )

@@ -3,6 +3,7 @@ import unittest
 import functools
 
 from django.conf import settings
+from django.db.models import Max
 from django.test import TestCase
 from django.shortcuts import render
 from django.core.exceptions import ValidationError
@@ -635,6 +636,37 @@ class NodeCoreSortRelationshipTests(TestCase):
         for k, n in self.nodes.__dict__.items():
             if k.startswith('p'):
                 n.save()
+
+    def test_cope_with_sort_with_no_roots_in_base_query(self,):
+        qs = BasicNode.objects.filter(pk__in=[3,4,5,6,7,8])
+        qs_withsort = qs.with_sort_sequence(
+            DagSortOrder.TOP_DOWN,
+            )
+        qs_sorted = qs_withsort.order_by('dag_top_down_path')
+        self.assertEqual(
+            list(qs_sorted), []
+        )
+
+    def test_cope_with_sort_on_known_empty_query(self,):
+        qs = BasicNode.objects.none()
+        qs_withsort = qs.with_sort_sequence(
+            DagSortOrder.TOP_DOWN,
+            )
+        qs_sorted = qs_withsort.order_by('dag_top_down_path')
+        self.assertEqual(
+            list(qs_sorted), []
+        )
+
+    def test_cope_with_sort_on_filter_to_empty_query(self,):
+        max_pk = BasicNode.objects.all().aggregate(Max('pk'))
+        qs = BasicNode.objects.filter(pk__gt=max_pk['pk__max'])
+        qs_withsort = qs.with_sort_sequence(
+            DagSortOrder.TOP_DOWN,
+            )
+        qs_sorted = qs_withsort.order_by('dag_top_down_path')
+        self.assertEqual(
+            list(qs_sorted), []
+        )
 
     def test_queryset_sortting_filter(self):
         for i in range(10, 16):

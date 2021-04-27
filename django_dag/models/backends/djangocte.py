@@ -18,6 +18,7 @@ from django.db.models.expressions import (
     Window,
     Q,
 )
+from django.db.models.query import EmptyQuerySet
 from django.db.models import FilteredRelation
 from django.db.models import Exists, OuterRef, Subquery
 from django.db.models import Max
@@ -86,9 +87,17 @@ class ProtoNodeQuerySet(CTEQuerySet):
         node_model = self.model
         edge_model = self.model.get_edge_model()
         result_model = edge_model
+
+        if isinstance(self, EmptyQuerySet):
+            return self.annotate(**{
+                path_filedname: Value(None, output_field=models.IntegerField()),
+                QUERY_DEPTH_FIELDNAME: Value(None, output_field=models.IntegerField()),
+            })
+
         node_paths_cte = With.recursive(
             self._make_path_src_cte_fn(
-                node_model, self.roots(),
+                node_model,
+                node_model.objects.filter(pk__in=Subquery(self.roots().values("pk"))),
                 sequence_field if sequence_field else F('child_id'),
                 padsize
             ),
