@@ -138,6 +138,7 @@ class ProtoNodeQuerySet(QuerySet):
         :param padsize int: Length of the field segment for each node in pits path
             to it root.
         """
+        sequence_field= None
         if self.model.sequence_manager:
             sequence_field=self.model.sequence_manager \
                 .get_node_rel_sort_query_component(
