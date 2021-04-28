@@ -637,6 +637,19 @@ class NodeCoreSortRelationshipTests(TestCase):
             if k.startswith('p'):
                 n.save()
 
+    def test_with_sort_query_return_nodes(self,):
+        qs = BasicNode.objects
+        with self.subTest(msg = "DagSortOrder TOP_DOWN"):
+            qs_withsort = qs.with_sort_sequence(
+                DagSortOrder.TOP_DOWN,
+                )
+            map( lambda obj:self.assertIsInstance(obj, BasicNode), list(qs_withsort))
+        with self.subTest(msg = "DagSortOrder DEPTH_FIRST"):
+            qs_withsort = qs.with_sort_sequence(
+                DagSortOrder.DEPTH_FIRST,
+                )
+            map( lambda obj:self.assertIsInstance(obj, BasicNode), list(qs_withsort))
+
     def test_cope_with_sort_with_no_roots_in_base_query(self,):
         self.nodes.p6.add_child(self.nodes.p9)
         self.nodes.p4.add_child(self.nodes.p9)
