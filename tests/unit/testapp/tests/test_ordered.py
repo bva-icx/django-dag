@@ -19,6 +19,7 @@ if hasattr(settings,'DJANGO_DAG_BACKEND'):
 class NodeStorage():
     pass
 
+
 class DagOrderingBasicTests(TestCase):
     def setUp(self):
         self.nodes_eo = NodeStorage()
@@ -113,9 +114,7 @@ class DagOrderingBasicTests(TestCase):
         self.nodes_eo.p2.add_child(self.nodes_eo.p5, sequence=1)
         self.nodes_eo.p2.add_child(self.nodes_eo.p6, sequence=7)
         self.nodes_eo.p2.add_child(self.nodes_eo.p7, sequence=5)
-
         self.nodes_eo.p1.insert_child_after(self.nodes_eo.p6, self.nodes_eo.p7)
-
         self.assertEqual(OrderedEdge.objects.all().count(), 6)
         self.assertEqual(
             list(OrderedEdge.objects.all().order_by('parent__name','child__name').values_list(
@@ -129,9 +128,7 @@ class DagOrderingBasicTests(TestCase):
         self.nodes_eo.p2.add_child(self.nodes_eo.p5, sequence=1)
         self.nodes_eo.p2.add_child(self.nodes_eo.p6, sequence=7)
         self.nodes_eo.p2.add_child(self.nodes_eo.p7, sequence=5)
-
         self.nodes_eo.p1.insert_child_before(self.nodes_eo.p6, self.nodes_eo.p5)
-
         self.assertEqual(OrderedEdge.objects.all().count(), 6)
         self.assertEqual(
             list(OrderedEdge.objects.all().order_by('parent__name','child__name').values_list(
