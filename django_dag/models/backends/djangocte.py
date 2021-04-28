@@ -84,7 +84,7 @@ class ProtoNodeQuerySet(CTEQuerySet):
     def _sort_query(self, *args, padsize,
             sort_name='sort', sequence_field=None):
         path_filedname = QUERY_PATH_FIELDNAME_FORMAT % { 'name': sort_name,}
-        node_model = self.model
+        node_model = self.model.get_node_model()
         edge_model = self.model.get_edge_model()
         result_model = edge_model
 
@@ -97,7 +97,7 @@ class ProtoNodeQuerySet(CTEQuerySet):
         node_paths_cte = With.recursive(
             self._make_path_src_cte_fn(
                 node_model,
-                node_model.objects.filter(pk__in=Subquery(self.roots().values("pk"))),
+                node_model.objects.filter(pk__in=Subquery(node_model.objects.roots().values("pk"))),
                 sequence_field if sequence_field else F('child_id'),
                 padsize
             ),
@@ -111,7 +111,10 @@ class ProtoNodeQuerySet(CTEQuerySet):
             .annotate(**{
                 path_filedname:node_paths_cte.col.path,
                 QUERY_DEPTH_FIELDNAME: node_paths_cte.col.depth,
-            })
+
+            }).filter(
+                pk__in=Subquery(self.values("pk"))
+            )
         roots = self.roots() \
             .annotate(**{
                 path_filedname:self._LPad(F('id'), padsize),

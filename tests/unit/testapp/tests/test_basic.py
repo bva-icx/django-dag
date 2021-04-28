@@ -638,13 +638,25 @@ class NodeCoreSortRelationshipTests(TestCase):
                 n.save()
 
     def test_cope_with_sort_with_no_roots_in_base_query(self,):
-        qs = BasicNode.objects.filter(pk__in=[3,4,5,6,7,8])
+        self.nodes.p6.add_child(self.nodes.p9)
+        self.nodes.p4.add_child(self.nodes.p9)
+
+        qs = BasicNode.objects.filter(pk__in=[3,4,5,7,8,9])
         qs_withsort = qs.with_sort_sequence(
             DagSortOrder.TOP_DOWN,
             )
-        qs_sorted = qs_withsort.order_by('dag_top_down_path')
+        qs_sorted = qs_withsort.order_by('dag_top_down_path') \
+            .values_list('pk', 'dag_top_down_path')
         self.assertEqual(
-            list(qs_sorted), []
+            list(qs_sorted), [
+                (3, '0001,0003'),
+                (4, '0001,0004'),
+                (9, '0001,0004,0009'),
+                (5, '0001,0005'),
+                (9, '0002,0006,0009'),
+                (7, '0002,0007'),
+                (8, '0002,0008'),
+            ]
         )
 
     def test_cope_with_sort_on_known_empty_query(self,):

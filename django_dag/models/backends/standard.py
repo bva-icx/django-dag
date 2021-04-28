@@ -156,15 +156,16 @@ class ProtoNodeQuerySet(QuerySet):
 
         _sequence_field = sequence_field if sequence_field else F('id')
         path_filedname = QUERY_PATH_FIELDNAME_FORMAT % { 'name': sort_name,}
-        node_model = self.model
+        node_model = self.model.get_node_model()
         pks = list(map(lambda x:x.pk , self))
         def child_values(roots):
             for f in roots:
                 base_path = getattr(f, path_filedname)
                 depth = getattr(f, QUERY_DEPTH_FIELDNAME) + 1
-                yield f
+                if f.pk in pks:
+                    yield f
                 yield from child_values(
-                    f.children.filter(pk__in = pks).annotate(
+                    f.children.annotate(
                         **{
                             'path_parent_ref': Value(
                                 int(f.pk), output_field=models.IntegerField()),
@@ -179,7 +180,7 @@ class ProtoNodeQuerySet(QuerySet):
                         }
                     ))
 
-        roots = self.roots() \
+        roots = node_model.objects.roots() \
             .annotate(**{
                 path_filedname: self._LPad_sql(F('id'), padsize),
                 QUERY_DEPTH_FIELDNAME: Cast(
