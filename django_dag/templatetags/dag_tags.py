@@ -42,7 +42,7 @@ class RecurseDictNode(template.Node):
                         output.append(self.renderCallback(
                             context, child_items, level + 1))
                     except:
-                        output.append(unicode(v))
+                        output.append(str(v))
 
             if 'endloop' in self.nodeList:
                 output.append(self.nodeList['endloop'].render(context))
