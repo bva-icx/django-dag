@@ -7,17 +7,20 @@ from .tree_test_output import expected_tree_output
 from ..models.inherited import (
     BaseDerivedNode, DerivedNodeA, DerivedNodeB, DerivedEdge,
     ConcreteBaseNode, InheritedConcreteNode, InheritedConcreteEdge,
-    InheritedAbstractNode,InheritedAbstractEdge
+    InheritedAbstractNode, InheritedAbstractEdge
 )
 from django_dag.exceptions import NodeNotReachableException
 from .test_basic import DagStructureTests
 
+
 class NodeStorage():
     pass
+
 
 class DagStructureTestsInherited(DagStructureTests):
     nodeToTest = InheritedAbstractNode
     edgeToTest = InheritedAbstractEdge
+
     def setUp(self,):
         self.nodes = NodeStorage()
         for i in range(1, 12):
@@ -30,6 +33,7 @@ class DagStructureTestsInherited(DagStructureTests):
 class DagStructureTestsConcreteInherited(DagStructureTests):
     nodeToTest = InheritedConcreteNode
     edgeToTest = InheritedConcreteEdge
+
     def setUp(self,):
         self.nodes = NodeStorage()
         for i in range(1, 12):
@@ -43,12 +47,13 @@ class DagStructureTestsConcreteInherited(DagStructureTests):
 class DagStructureTestsDerivedA(DagStructureTests):
     nodeToTest = DerivedNodeA
     edgeToTest = DerivedEdge
+
     def setUp(self,):
         self.nodes = NodeStorage()
         for i in range(1, 12):
             n = DerivedNodeA(name="%s" % i)
             n.save()
-            setattr(self.nodes, "p%s" % i,n)
+            setattr(self.nodes, "p%s" % i, n)
 
 
 class DagStructureTestsDerivedMultiNode(TestCase):
@@ -63,7 +68,7 @@ class DagStructureTestsDerivedMultiNode(TestCase):
         self.build_structure()
 
     def build_structure(self,):
-        for a in range(0,20):
+        for a in range(0, 20):
             # Shift id of edge:
             self.nodes.pA1.add_child(self.nodes.pA2)
             self.nodes.pA1.remove_child(self.nodes.pA2)

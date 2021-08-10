@@ -33,12 +33,14 @@ class RecurseDictNode(template.Node):
                 output.append(self.nodeList['value'].render(context))
 
                 if type(v) == list or type(v) == tuple:
-                    child_items = [ (None, x) for x in v ]
-                    output.append(self.renderCallback(context, child_items, level + 1))
+                    child_items = [(None, x) for x in v]
+                    output.append(self.renderCallback(
+                        context, child_items, level + 1))
                 else:
                     try:
                         child_items = v.items()
-                        output.append(self.renderCallback(context, child_items, level + 1))
+                        output.append(self.renderCallback(
+                            context, child_items, level + 1))
                     except:
                         output.append(unicode(v))
 
@@ -64,11 +66,13 @@ class RecurseDictNode(template.Node):
 def recursedict_tag(parser, token):
     bits = list(token.split_contents())
     if len(bits) != 2 and bits[0] != 'recursedict':
-        raise template.TemplateSyntaxError("Invalid tag syntax expected '{% recursedict [dictVar] %}'")
+        raise template.TemplateSyntaxError(
+            "Invalid tag syntax expected '{% recursedict [dictVar] %}'")
     sequence = parser.compile_filter(bits[1])
     nodeList = {}
     while len(nodeList) < 4:
-        nodelist_loop = parser.parse(('value','loop','endloop','endrecursedict'))
+        nodelist_loop = parser.parse(
+            ('value', 'loop', 'endloop', 'endrecursedict'))
         token = parser.next_token()
         nodeList[token.contents] = nodelist_loop
         if token.contents == 'endrecursedict':

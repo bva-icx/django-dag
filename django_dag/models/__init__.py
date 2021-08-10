@@ -5,14 +5,15 @@ Directed Acyclic Graph structure.
 Some ideas stolen from:
     from https://github.com/stdbrouw/django-treebeard-dag
 """
+from importlib import import_module
 from django.db import models
 from django.conf import settings
-from importlib import import_module
-from .order_control import BaseDagOrderController
-from .backends.base import BaseNode as NodeBase
 from django.db.models import F
+from django_dag.exceptions import NoOrderRelationDefined
+from .order_control import BaseDagOrderController
 
-module_name = getattr(settings, 'DJANGO_DAG_BACKEND', "django_dag.models.backends.standard")
+module_name = getattr(settings, 'DJANGO_DAG_BACKEND',
+                      "django_dag.models.backends.standard")
 backend = import_module(module_name)
 
 BaseNodeManager = backend.ProtoNodeManager
@@ -20,8 +21,7 @@ BaseEdgeManager = backend.ProtoEdgeManager
 
 from .query import BaseNodeQuerySet, BaseEdgeQuerySet, DagSortOrder
 
-
-__all__ =[
+__all__ = [
     "edge_manager_factory",
     "node_manager_factory",
     "edge_factory",
@@ -62,6 +62,7 @@ def _get_base_manager(base_model, base_merge_manager):
 
     return _default_manager_class
 
+
 def edge_manager_factory(base_manager_class, ordering=None):
     class EdgeManager(base_manager_class):
         pass
@@ -85,9 +86,9 @@ def edge_factory( node_model,
     """
 
     edge_manager = edge_manager_factory(
-            _get_base_manager(base_model, backend.ProtoNodeManager),
-            ordering,
-        ) if manager is None else manager
+        _get_base_manager(base_model, backend.ProtoNodeManager),
+        ordering,
+    ) if manager is None else manager
 
     class Edge(base_model):
         class Meta:
@@ -97,18 +98,18 @@ def edge_factory( node_model,
 
         parent = models.ForeignKey(
             node_model,
-            related_name="%schild_%%(class)s_set"%(related_name_base,),
-            related_query_name="%schild_%%(class)ss"%(related_name_base,),
-            to_field = parent_to_field,
+            related_name="%schild_%%(class)s_set" % (related_name_base,),
+            related_query_name="%schild_%%(class)ss" % (related_name_base,),
+            to_field=parent_to_field,
             on_delete=models.CASCADE
-            )
+        )
         child = models.ForeignKey(
             node_model,
-            related_name="%sparent_%%(class)s_set"%(related_name_base,),
-            related_query_name="%sparent_%%(class)ss"%(related_name_base,),
-            to_field = child_to_field,
+            related_name="%sparent_%%(class)s_set" % (related_name_base,),
+            related_query_name="%sparent_%%(class)ss" % (related_name_base,),
+            to_field=child_to_field,
             on_delete=models.CASCADE
-            )
+        )
 
         if isinstance(ordering, BaseDagOrderController):
             sequence_field_name = ordering.sequence_field_name
@@ -124,9 +125,9 @@ def edge_factory( node_model,
             if not kwargs.pop('disable_circular_check', False):
                 self.parent.get_node_model().circular_checker(
                     self.parent, self.child)
-            super(Edge, self).save(*args, **kwargs) # Call the "real" save() method.
+            # Call the "real" save() method.
+            super(Edge, self).save(*args, **kwargs)
 
-    #BASE_EDGE_TYPES.append(Edge)
     return Edge
 
 
@@ -151,9 +152,10 @@ def node_manager_factory(base_manager_class, ordering=None, ):
             if not hasattr(self, 'target_field_name'):
                 # If we don't have a target_field_name we are probably not a related
                 # manager so we can not order by
-                if getattr(self.model, sequence_field_name , None) is None:
-                    ### FIXME - Instead of getting here we should raise a check model constraint
-                    raise NoOrderRelationDefined("You cannot order if you don't know what to order by")
+                if getattr(self.model, sequence_field_name, None) is None:
+                    # FIXME - Instead of getting here we should raise a check model constraint
+                    raise NoOrderRelationDefined(
+                        "You cannot order if you don't know what to order by")
                     # FIXME: Decide how to manage assert below
                     assert False, "You cannot order if you don't know what to order by"
                     return self
@@ -166,7 +168,7 @@ def node_manager_factory(base_manager_class, ordering=None, ):
 
             instance_or_model = getattr(self, 'instance', self.model)
             order_query = self.sequence_manager.get_node_rel_sort_query_component(
-                    instance_or_model, target, source)
+                instance_or_model, target, source)
 
             if isinstance(order_query, F):
                 if order_query.name == fieldname:
@@ -195,21 +197,21 @@ def node_factory( edge_model,
     """Dag Node factory"""
 
     node_manager = node_manager_factory(
-            _get_base_manager(base_model, backend.ProtoNodeManager),
-            ordering,
-        ) if manager is None else manager
+        _get_base_manager(base_model, backend.ProtoNodeManager),
+        ordering,
+    ) if manager is None else manager
 
     class Node(base_model, backend.ProtoNode):
         class Meta:
             abstract = True
 
         objects = node_manager() if queryset is None else node_manager.from_queryset(queryset)()
-        children  = models.ManyToManyField(
-                'self',
-                blank = children_null,
-                symmetrical = False,
-                through = edge_model,
-                related_name = 'parents')
+        children = models.ManyToManyField(
+            'self',
+            blank=children_null,
+            symmetrical=False,
+            through=edge_model,
+            related_name='parents')
 
         if isinstance(ordering, BaseDagOrderController):
             sequence_field_name = ordering.sequence_field_name

@@ -63,14 +63,14 @@ def filter_order_with_annotations(queryset,
 
     order_case = []
     annotations_lists = defaultdict(list)
-    used=[]
+    used = []
     query = queryset.none()
-    filter_condition=defaultdict(list)
+    filter_condition = defaultdict(list)
     pos = None
     for pos, instance_value in enumerate(field_values):
         when_condition = {}
-        for fn,fv in zip(field_names, instance_value):
-            when_condition.update({fn: fv,})
+        for fn, fv in zip(field_names, instance_value):
+            when_condition.update({fn: fv, })
         if when_condition in used:
             # Start new query and union
             query = filter_order_with_annotations(
@@ -82,29 +82,30 @@ def filter_order_with_annotations(queryset,
                 sequence_name=sequence_name
             )
             break
-        for fn,fv in when_condition.items():
+        for fn, fv in when_condition.items():
             filter_condition[f'{fn}__in'].append(fv)
         for ak, av in annotations[pos].items():
-            anno_when  = when_condition.copy()
-            anno_when.update({'then':av })
+            anno_when = when_condition.copy()
+            anno_when.update({'then': av})
             annotations_lists[ak].append(When(**anno_when))
         if sequence_name:
-            anno_when  = when_condition.copy()
-            anno_when.update({'then': Cast(Value(pos+offset), output_field=models.IntegerField()) })
+            anno_when = when_condition.copy()
+            anno_when.update(
+                {'then': Cast(Value(pos+offset), output_field=models.IntegerField())})
             annotations_lists[sequence_name].append(When(**anno_when))
         used.append(when_condition.copy())
         when_condition.update({'then': offset+pos})
         order_case.append(When(**when_condition))
 
     if pos is None:
-        return query.annotate(**{ name: Value(None, output_field=models.IntegerField()) for name in empty_annotations})
+        return query.annotate(**{name: Value(None, output_field=models.IntegerField()) for name in empty_annotations})
 
-    annotations_cases = {ak: Case(*av) for ak, av in  annotations_lists.items()}
+    annotations_cases = {ak: Case(*av) for ak, av in annotations_lists.items()}
     order_by = Case(*order_case)
     query = query.union(
-            queryset.filter(**filter_condition) \
-            .annotate(**annotations_cases)
-        )
+        queryset.filter(**filter_condition)
+        .annotate(**annotations_cases)
+    )
     return query
 
 
@@ -119,7 +120,7 @@ class ProtoNodeQuerySet(QuerySet):
     def _LPad_py(self, value, padsize):
         return str(value).zfill(padsize)
 
-    def with_top_down(self, *args, padsize=_PATH_PADDING_SIZE ,**kwargs):
+    def with_top_down(self, *args, padsize=_PATH_PADDING_SIZE, **kwargs):
         """
         Generates a query that does a top-to-bottom traversal without regard to any
         possible (left-to-right) ordering of the nodes
@@ -130,7 +131,7 @@ class ProtoNodeQuerySet(QuerySet):
         return self._sort_query(*args,
             padsize=padsize, sort_name='top_down' ,**kwargs)
 
-    def with_depth_first(self, *args, padsize=_PATH_PADDING_SIZE ,**kwargs):
+    def with_depth_first(self, *args, padsize=_PATH_PADDING_SIZE, **kwargs):
         """
         Generates a query that does a depth-first traversal, this account for the nodes
         sequence ordering (left-to-right) of the nodes.
@@ -138,9 +139,9 @@ class ProtoNodeQuerySet(QuerySet):
         :param padsize int: Length of the field segment for each node in pits path
             to it root.
         """
-        sequence_field= None
+        sequence_field = None
         if self.model.sequence_manager:
-            sequence_field=self.model.sequence_manager \
+            sequence_field = self.model.sequence_manager \
                 .get_node_rel_sort_query_component(
                     self.model, 'child', 'parent',
                     parent_filter_ref=models.OuterRef('path_parent_ref')
@@ -149,16 +150,16 @@ class ProtoNodeQuerySet(QuerySet):
             padsize=padsize, sort_name='depth_first',
             sequence_field=sequence_field, **kwargs)
 
-
     def _sort_query(self, *args,
-            sort_name='sort',
-            sequence_field=None,
-            padsize=_PATH_PADDING_SIZE):
+                    sort_name='sort',
+                    sequence_field=None,
+                    padsize=_PATH_PADDING_SIZE):
 
         _sequence_field = sequence_field if sequence_field else F('id')
-        path_filedname = QUERY_PATH_FIELDNAME_FORMAT % { 'name': sort_name,}
+        path_filedname = QUERY_PATH_FIELDNAME_FORMAT % {'name': sort_name, }
         node_model = self.model.get_node_model()
-        pks = list(map(lambda x:x.pk , self))
+        pks = list(map(lambda x: x.pk, self))
+
         def child_values(roots):
             for f in roots:
                 base_path = getattr(f, path_filedname)
@@ -195,15 +196,15 @@ class ProtoNodeQuerySet(QuerySet):
             filter_order_with_annotations(
                 node_model.objects,
                 field_names=['id'],
-                field_values=[ (d.pk,) for d in data],
+                field_values=[(d.pk,) for d in data],
                 annotations=[
                     {
                         path_filedname: Cast(
-                            Value(getattr(d,path_filedname)),
+                            Value(getattr(d, path_filedname)),
                             output_field=models.TextField()
                         ),
                         QUERY_DEPTH_FIELDNAME: Cast(
-                            Value(getattr(d,QUERY_DEPTH_FIELDNAME)),
+                            Value(getattr(d, QUERY_DEPTH_FIELDNAME)),
                             output_field=models.IntegerField()
                         ),
                     }
@@ -220,12 +221,12 @@ class ProtoNode(BaseNode):
     # Public API
     @property
     def descendants(self):
-            return self._convert_to_lazy_node_query(self._get_descendant())
+        return self._convert_to_lazy_node_query(self._get_descendant())
 
     def get_descendant_pks(self):
-            return list(self._get_descendant(node_to_cache_attr=lambda x:x.pk))
+        return list(self._get_descendant(node_to_cache_attr=lambda x: x.pk))
 
-    def _get_descendant(self, cached_results=None, node_to_cache_attr=lambda x:x):
+    def _get_descendant(self, cached_results=None, node_to_cache_attr=lambda x: x):
         if cached_results is None:
             cached_results = dict()
         if node_to_cache_attr(self) in cached_results.keys():
@@ -237,7 +238,7 @@ class ProtoNode(BaseNode):
                 res.update(f._get_descendant(
                     cached_results=cached_results,
                     node_to_cache_attr=node_to_cache_attr
-                    ))
+                ))
             cached_results[node_to_cache_attr(self)] = res
             return res
 
@@ -246,9 +247,9 @@ class ProtoNode(BaseNode):
         return self._convert_to_lazy_node_query(self._get_ancestor())
 
     def get_ancestor_pks(self):
-        return list(self._get_ancestor(node_to_cache_attr=lambda x:x.pk))
+        return list(self._get_ancestor(node_to_cache_attr=lambda x: x.pk))
 
-    def _get_ancestor(self, cached_results=None, node_to_cache_attr=lambda x:x):
+    def _get_ancestor(self, cached_results=None, node_to_cache_attr=lambda x: x):
         if cached_results is None:
             cached_results = dict()
         if node_to_cache_attr(self) in cached_results.keys():
@@ -279,25 +280,25 @@ class ProtoNode(BaseNode):
             # so we can always return [] for the path. It can't have an edge, because
             # a self link forms a cycle of legnth one, and we try to guarantee being
             # cycle free (this as Directed-ACYCLIC-Graph)
-            return [[],]
+            return [[], ]
 
         if target in self.children.all():
             # If the target is a child of the source object there can only
             # be 1 shortest path
             if use_edges:
-                return [ [e] for e in  self.get_edge_model().objects.filter(
-                        child=target,
-                        parent=self
-                    ) ]
+                return [[e] for e in self.get_edge_model().objects.filter(
+                    child=target,
+                    parent=self
+                )]
             else:
-                return [[target if downwards else self],]
+                return [[target if downwards else self], ]
 
         if target.pk in self.get_descendant_pks():
             paths = []
             path_length = sys.maxsize
             childItems = self.get_edge_model().objects.filter(
-                    parent=self
-                )
+                parent=self
+            )
 
             for child_edge in childItems:
                 # Select the element in the return data struct.
@@ -307,22 +308,24 @@ class ProtoNode(BaseNode):
                     element = child_edge.child if downwards else child_edge.parent
 
                 try:
-                    # Use ourselves recursively to find the rest of 
+                    # Use ourselves recursively to find the rest of
                     # the path (if extant) from each of our children
-                    desc_paths = child_edge.child._get_paths(target,
-                        use_edges=use_edges,downwards=downwards)
+                    desc_paths = child_edge.child._get_paths(
+                        target,
+                        use_edges=use_edges,
+                        downwards=downwards)
                     desc_path_length = len(desc_paths[0]) + 1
-
 
                     if desc_path_length < path_length:
                         # We found a short path than anything before, so replace.
-                        paths = [ [element] + subpath for subpath in desc_paths ]
+                        paths = [[element] + subpath for subpath in desc_paths]
                         path_length = len(paths[0])
                     elif desc_path_length == path_length:
                         # We found a path of equal length so append to results
-                        equal_paths = [ [element] + subpath for subpath in desc_paths ]
+                        equal_paths = [[element] +
+                                       subpath for subpath in desc_paths]
                         paths.extend(equal_paths)
-                    #else a short path has already found so skip recording this one
+                    # else a short path has already found so skip recording this one
 
                 except NodeNotReachableException:
                     pass
@@ -331,25 +334,25 @@ class ProtoNode(BaseNode):
         return paths
 
     def get_roots(self):
-        at =  self.get_ancestors_tree()
+        at = self.get_ancestors_tree()
         roots = set()
         for a in at:
             roots.update(a._get_roots(at[a]))
-        return self._convert_to_lazy_node_query( roots or set([self]))
+        return self._convert_to_lazy_node_query(roots or set([self]))
 
     def _get_roots(self, at):
         """
         Works on objects: no queries
         """
         if not at:
-          return set([self])
+            return set([self])
         roots = set()
         for a2 in at:
             roots.update(a2._get_roots(at[a2]))
         return roots
 
     def get_leaves(self):
-        dt =  self.get_descendants_tree()
+        dt = self.get_descendants_tree()
         leaves = set()
         for d in dt:
             leaves.update(d._get_leaves(dt[d]))
@@ -360,7 +363,7 @@ class ProtoNode(BaseNode):
         Works on objects: no queries
         """
         if not dt:
-          return set([self])
+            return set([self])
         leaves = set()
         for d2 in dt:
             leaves.update(d2._get_leaves(dt[d2]))
@@ -388,7 +391,7 @@ class ProtoNode(BaseNode):
     def _convert_to_lazy_node_query(cls, data, query=None):
         if query is None:
             fixedquery = cls.get_node_model().objects.filter(
-                pk__in = map(lambda x:x.pk , data)
+                pk__in=map(lambda x: x.pk, data)
             )
         else:
             fixedquery = query._clone()

@@ -92,7 +92,7 @@ class BaseNode(object):
         :param descendant: The child node to add
         :return: return result from edge link save
         """
-        kwargs.update({'parent' : self, 'child' : descendant })
+        kwargs.update({'parent': self, 'child': descendant})
         disable_check = kwargs.pop('disable_circular_check', False)
 
         if self.sequence_manager and self.sequence_manager.get_node_sequence_field():
@@ -119,7 +119,8 @@ class BaseNode(object):
 
        :param descendant: The child node to detach
         """
-        self.children.through.objects.get(parent = self, child = descendant).delete()
+        self.children.through.objects.get(
+            parent=self, child=descendant).delete()
 
     def remove_parent(self, parent):
         """
@@ -127,9 +128,9 @@ class BaseNode(object):
 
        :param parent: The parent node to detach
         """
-        parent.children.through.objects.get(parent = parent, child = self).delete()
+        parent.children.through.objects.get(parent=parent, child=self).delete()
 
-    def distance(self, target, directed = True):
+    def distance(self, target, directed=True):
         """
         Finds the shortest hops count to the target vertex
 

@@ -7,6 +7,7 @@ from django_dag.models.order_control import (
     BaseDagEdgeOrderController
 )
 
+
 class DagNodeIntSorter(BaseDagNodeOrderController):
     """Simple node sorter based on Broken Integer implementation"""
     @classmethod
@@ -17,10 +18,10 @@ class DagNodeIntSorter(BaseDagNodeOrderController):
         to another model
         """
         return models.IntegerField(
-                verbose_name=_("Node sequence"),
-                db_index=True,
-                default=0,
-            )
+            verbose_name=_("Node sequence"),
+            db_index=True,
+            default=0,
+        )
 
     def key_between(self, instance, other, parent):
         """
@@ -33,7 +34,7 @@ class DagNodeIntSorter(BaseDagNodeOrderController):
         """
         Provide the next key in the sequence
         """
-        return instance.sequence + (100 - instance.sequence) /2
+        return instance.sequence + (100 - instance.sequence) / 2
 
     def initial_key(self,):
         """
@@ -59,10 +60,10 @@ class DagEdgeIntSorter(BaseDagEdgeOrderController):
         to another model
         """
         return models.IntegerField(
-                verbose_name=_("Edge sequence"),
-                db_index=True,
-                blank=True,
-            )
+            verbose_name=_("Edge sequence"),
+            db_index=True,
+            blank=True,
+        )
 
     def get_relatedsort_query_component(self, model, targetname, sourcename):
         """
@@ -74,21 +75,21 @@ class DagEdgeIntSorter(BaseDagEdgeOrderController):
         """
         sequence = model.get_edge_model().objects
         if isinstance(model, models.Model):
-            sequence = sequence.filter(**{sourcename:model})
+            sequence = sequence.filter(**{sourcename: model})
         sequence = sequence.filter(
-            **{targetname:OuterRef('pk')}
+            **{targetname: OuterRef('pk')}
         )
         return Subquery(sequence.values(self.sequence_field_name))
 
     def get_sorted_edge_queryset(self, node, target, source):
         edge_model = node.get_edge_model()
         return edge_model.objects.filter(**{
-                source: node
-            }).select_related(target).order_by(self.sequence_field_name)
+            source: node
+        }).select_related(target).order_by(self.sequence_field_name)
 
     def get_next_sibling(self, basenode, parent_node):
         edge_model = basenode.get_edge_model()
-        ## Our process here is to
+        # Our process here is to
         # Find edges which come off the base's parent node,
         # and are numbered higher than our found base to parent link.
         # These are then order and the first one by sequne selected.
@@ -96,10 +97,10 @@ class DagEdgeIntSorter(BaseDagEdgeOrderController):
         try:
             sibling_node_edge = edge_model.objects.filter(
                 parent=parent_node,
-                sequence__gt = edge_model.objects.get(
-                        parent=parent_node,
-                        child=basenode
-                    ).sequence
+                sequence__gt=edge_model.objects.get(
+                    parent=parent_node,
+                    child=basenode
+                ).sequence
             ).order_by(self.sequence_field_name).select_related('child').first()
         except ObjectDoesNotExist:
             return None
@@ -107,16 +108,16 @@ class DagEdgeIntSorter(BaseDagEdgeOrderController):
         return sibling_node_edge.child if sibling_node_edge else None
 
     def get_prev_sibling(self, basenode, parent_node):
-        ## See above for breakdown of quesry
+        # See above for breakdown of quesry
         edge_model = basenode.get_edge_model()
         try:
             sibling_node_edge = edge_model.objects.filter(
                 parent=parent_node,
-                sequence__lt = edge_model.objects.get(
-                        parent=parent_node,
-                        child=basenode
-                    ).sequence
-            ).order_by('-%s'%(self.sequence_field_name)).select_related('child').first()
+                sequence__lt=edge_model.objects.get(
+                    parent=parent_node,
+                    child=basenode
+                ).sequence
+            ).order_by('-%s' % (self.sequence_field_name)).select_related('child').first()
         except ObjectDoesNotExist:
             return None
         return sibling_node_edge.child if sibling_node_edge else None
@@ -128,9 +129,10 @@ class DagEdgeIntSorter(BaseDagEdgeOrderController):
         """
         edges = instance.children.through.objects.filter(
             parent=parent,
-            child__in=[ instance, other]
+            child__in=[instance, other]
         ).order_by(self.sequence_field_name).values_list(self.sequence_field_name, flat=True)
-        assert len(edges) == 2, "We only support one noe connecting parent to child"
+        assert len(
+            edges) == 2, "We only support one noe connecting parent to child"
         return int(edges[0] + (edges[1] - edges[0])/2)
 
     def next_key(self, instance, parent):
@@ -141,7 +143,7 @@ class DagEdgeIntSorter(BaseDagEdgeOrderController):
             parent=parent,
             child=instance
         ).values_list(self.sequence_field_name, flat=True)
-        return edges[0] + (100 - edges[0]) /2
+        return edges[0] + (100 - edges[0]) / 2
 
     def initial_key(self,):
         """
@@ -157,4 +159,4 @@ class DagEdgeIntSorter(BaseDagEdgeOrderController):
             parent=parent,
             child=instance
         ).values_list(self.sequence_field_name, flat=True)
-        return edges[0] - edges[0] /2
+        return edges[0] - edges[0] / 2

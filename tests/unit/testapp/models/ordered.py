@@ -32,6 +32,7 @@ class OrderedEdge(edge_factory(
         super().save(*args, **kwargs)
         return self
 
+
 class EdgeOrderedNode(node_factory(
         OrderedEdge,
         ordering = DagEdgeIntSorter(),

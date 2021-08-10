@@ -12,6 +12,7 @@ class AbstractBaseNode(Model):
     class Meta:
         abstract = True
 
+
 class InheritedAbstractNode(
     node_factory(
         'InheritedAbstractEdge',

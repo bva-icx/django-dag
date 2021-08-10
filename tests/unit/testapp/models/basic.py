@@ -5,6 +5,7 @@ from django_dag.models import node_factory, edge_factory
 ################################################################
 # Almost the simplist of DAG models
 
+
 class BasicEdge(edge_factory('BasicNode', concrete=False)):
     """
     Simple Test Edge with name field
@@ -13,6 +14,7 @@ class BasicEdge(edge_factory('BasicNode', concrete=False)):
 
     class Meta:
         app_label = 'testapp'
+
 
 class BasicNode(node_factory(BasicEdge)):
     """
@@ -40,6 +42,7 @@ class BasicNodeES(node_factory('BasicEdgeES')):
 
     class Meta:
         app_label = 'testapp'
+
 
 class BasicEdgeES(edge_factory('BasicNodeES', concrete=False)):
     """

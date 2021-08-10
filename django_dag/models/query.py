@@ -1,10 +1,11 @@
 from ..models import backend
 from enum import IntEnum, auto
 
+
 class DagSortOrder(IntEnum):
     TOP_DOWN = auto()
-    BREADTH_FIRST =  auto()
-    DEPTH_FIRST =  auto()
+    BREADTH_FIRST = auto()
+    DEPTH_FIRST = auto()
 
 
 class BaseNodeQuerySet(backend.ProtoNodeQuerySet):
@@ -37,7 +38,6 @@ class BaseNodeQuerySet(backend.ProtoNodeQuerySet):
         if node is not None:
             return (self & node.get_leaves()).distinct()
         return self.filter(children__isnull=True)
-
 
     def with_sort_sequence(self, method, *args, **kwargs):
         """
