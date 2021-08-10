@@ -32,9 +32,9 @@ QUERY_DEPTH_FIELDNAME = 'dag_depth'
 
 
 def filter_order_with_annotations(queryset,
-    field_names=[], field_values=[], annotations=[],
-    empty_annotations=[],
-    sequence_name=_QUERY_ORDER_FIELDNAME, offset=0):
+        field_names=[], field_values=[], annotations=[],
+        empty_annotations=[],
+        sequence_name=_QUERY_ORDER_FIELDNAME, offset=0):
     """
     Filter a queryset to match a predefined order pattern.
 
@@ -91,17 +91,16 @@ def filter_order_with_annotations(queryset,
         if sequence_name:
             anno_when = when_condition.copy()
             anno_when.update(
-                {'then': Cast(Value(pos+offset), output_field=models.IntegerField())})
+                {'then': Cast(Value(pos + offset), output_field=models.IntegerField())})
             annotations_lists[sequence_name].append(When(**anno_when))
         used.append(when_condition.copy())
-        when_condition.update({'then': offset+pos})
+        when_condition.update({'then': offset + pos})
         order_case.append(When(**when_condition))
 
     if pos is None:
         return query.annotate(**{name: Value(None, output_field=models.IntegerField()) for name in empty_annotations})
 
     annotations_cases = {ak: Case(*av) for ak, av in annotations_lists.items()}
-    order_by = Case(*order_case)
     query = query.union(
         queryset.filter(**filter_condition)
         .annotate(**annotations_cases)
@@ -129,7 +128,7 @@ class ProtoNodeQuerySet(QuerySet):
             to it root.
         """
         return self._sort_query(*args,
-            padsize=padsize, sort_name='top_down' ,**kwargs)
+            padsize=padsize, sort_name='top_down', **kwargs)
 
     def with_depth_first(self, *args, padsize=_PATH_PADDING_SIZE, **kwargs):
         """
@@ -151,9 +150,9 @@ class ProtoNodeQuerySet(QuerySet):
             sequence_field=sequence_field, **kwargs)
 
     def _sort_query(self, *args,
-                    sort_name='sort',
-                    sequence_field=None,
-                    padsize=_PATH_PADDING_SIZE):
+            sort_name='sort',
+            sequence_field=None,
+            padsize=_PATH_PADDING_SIZE):
 
         _sequence_field = sequence_field if sequence_field else F('id')
         path_filedname = QUERY_PATH_FIELDNAME_FORMAT % {'name': sort_name, }
@@ -172,7 +171,7 @@ class ProtoNodeQuerySet(QuerySet):
                             'path_parent_ref': Value(
                                 int(f.pk), output_field=models.IntegerField()),
                             path_filedname: Concat(
-                                Value(base_path+","),
+                                Value(base_path + ","),
                                 self._LPad_sql(_sequence_field, padsize),
                             ),
                             QUERY_DEPTH_FIELDNAME: Cast(
@@ -269,7 +268,7 @@ class ProtoNode(BaseNode):
         try:
             if downwards is None or downwards is True:
                 return self._get_paths(target, use_edges=use_edges, downwards=True)
-        except NodeNotReachableException as err:
+        except NodeNotReachableException as err:  # noqa: F841
             if downwards is True:
                 raise
         return target._get_paths(self, use_edges=use_edges, downwards=False)

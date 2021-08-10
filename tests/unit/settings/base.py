@@ -1,5 +1,4 @@
 # Django settings for dag project.
-import os
 
 DEBUG = True
 

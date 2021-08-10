@@ -121,14 +121,14 @@ class BaseDagOrderController():
         so sorted in relation to the instance, if the model is a class then
         all result we be the indeterminate although in the reference implementation
         of edgeordering it is the first sequence. The precise details are
-        implementation specific to the the concrete sequence_manager 
+        implementation specific to the the concrete sequence_manager
         The returned query should be relative to the NodeEdge model
 
         :param model: A Node model or model instance
         :param target: the name of the field linking to the target
         :param source: the name of the field linking to the source node
 
-        :return: A componet to be used in a further query 
+        :return: A componet to be used in a further query
             F, Subquery etc. which will result in a value for the node sequence
         """
         raise NotImplementedError

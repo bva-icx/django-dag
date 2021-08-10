@@ -1,13 +1,9 @@
 from django_dag.models.order_control import Position
-import multiprocessing
 import unittest
-
 from django.conf import settings
 from django.test import TestCase
-from django.core.exceptions import ValidationError
-from .tree_test_output import expected_tree_output
 from ..models.ordered import EdgeOrderedNode, OrderedEdge
-from ..models.ordered import OrderedNode, NodeOrderedEdge
+from ..models.ordered import OrderedNode
 
 from django_dag.exceptions import InvalidNodeMove
 from django_dag.models import DagSortOrder
@@ -327,7 +323,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
             self.nodes.p5.get_prev_sibling(self.nodes.p2), None)
 
     def test_cannot_move_a_node_between_parents_causing_circular_ref(self):
-        edge = self.nodes.p5.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p5.add_child(self.nodes.p9, sequence=12)
         with self.assertRaises(InvalidNodeMove):
             self.nodes.p1.move_node(
                 None,
@@ -335,7 +331,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
             )
 
     def test_can_move_a_node_between_parents_default_location(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p2.add_child(self.nodes.p9, sequence=12)
         self.assertEqual(
             list(self.nodes.p9.parents.values_list('pk', flat=True)),
             [self.nodes.p2.pk]
@@ -350,7 +346,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_between_parents_first(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p2.add_child(self.nodes.p9, sequence=12)
         self.assertEqual(
             list(self.nodes.p9.parents.values_list('pk', flat=True)),
             [self.nodes.p2.pk]
@@ -372,7 +368,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_sibling_node_to_be_first(self):
-        edge = self.nodes.p1.add_child(self.nodes.p9, sequence=14)
+        self.nodes.p1.add_child(self.nodes.p9, sequence=14)
         self.nodes.p9.move_node(
             self.nodes.p1,
             self.nodes.p1,
@@ -399,7 +395,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_between_parents_last(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p2.add_child(self.nodes.p9, sequence=12)
         self.assertEqual(
             list(self.nodes.p9.parents.values_list('pk', flat=True)),
             [self.nodes.p2.pk]
@@ -421,7 +417,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_sibling_node_to_be_last(self):
-        edge = self.nodes.p1.add_child(self.nodes.p9, sequence=2)
+        self.nodes.p1.add_child(self.nodes.p9, sequence=2)
         self.nodes.p9.move_node(
             self.nodes.p1,
             self.nodes.p1,
@@ -448,7 +444,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_between_parents_before(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p2.add_child(self.nodes.p9, sequence=12)
         self.assertEqual(
             list(self.nodes.p9.parents.values_list('pk', flat=True)),
             [self.nodes.p2.pk]
@@ -472,7 +468,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_before_a_sibling(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p2.add_child(self.nodes.p9, sequence=12)
         self.nodes.p9.move_node(
             self.nodes.p2,
             self.nodes.p2,
@@ -488,7 +484,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_before_a_sibling_quickapi(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p2.add_child(self.nodes.p9, sequence=12)
         self.nodes.p2.move_child_before(
             self.nodes.p9,
             self.nodes.p7,
@@ -502,7 +498,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_between_parents_after(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p2.add_child(self.nodes.p9, sequence=12)
         self.assertEqual(
             list(self.nodes.p9.parents.values_list('pk', flat=True)),
             [self.nodes.p2.pk]
@@ -526,7 +522,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_after_a_sibling(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p2.add_child(self.nodes.p9, sequence=12)
         self.nodes.p9.move_node(
             self.nodes.p2,
             self.nodes.p2,
@@ -542,7 +538,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_after_a_sibling_quickapi(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p2.add_child(self.nodes.p9, sequence=12)
         self.nodes.p2.move_child_after(
             self.nodes.p9,
             self.nodes.p7,
@@ -556,7 +552,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_between_parents_beforestart(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p2.add_child(self.nodes.p9, sequence=12)
         self.assertEqual(
             list(self.nodes.p9.parents.values_list('pk', flat=True)),
             [self.nodes.p2.pk]
@@ -580,7 +576,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_between_parents_afterend(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p2.add_child(self.nodes.p9, sequence=12)
         self.assertEqual(
             list(self.nodes.p9.parents.values_list('pk', flat=True)),
             [self.nodes.p2.pk]
@@ -794,7 +790,7 @@ class NodeSortedDagRelationshipTests(TestCase):
             self.nodes.p6.get_prev_sibling(self.nodes.p2), None)
 
     def test_cannot_move_a_node_between_parents_causing_circular_ref(self):
-        edge = self.nodes.p3.add_child(self.nodes.p9)
+        self.nodes.p3.add_child(self.nodes.p9)
         self.nodes.p9.sequence = 12
         self.nodes.p9.save()
         with self.assertRaises(InvalidNodeMove):
@@ -804,7 +800,7 @@ class NodeSortedDagRelationshipTests(TestCase):
             )
 
     def test_can_move_a_node_between_parents_default_location(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p2.add_child(self.nodes.p9)
         self.nodes.p9.sequence = 12
         self.nodes.p9.save()
         self.assertEqual(
@@ -821,7 +817,7 @@ class NodeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_between_parents_first(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p2.add_child(self.nodes.p9)
         self.nodes.p9.sequence = 12
         self.nodes.p9.save()
 
@@ -846,7 +842,7 @@ class NodeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_sibling_node_to_be_first(self):
-        edge = self.nodes.p1.add_child(self.nodes.p9)
+        self.nodes.p1.add_child(self.nodes.p9)
         self.nodes.p9.sequence = 14
         self.nodes.p9.save()
 
@@ -876,7 +872,7 @@ class NodeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_between_parents_last(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p2.add_child(self.nodes.p9)
         self.nodes.p9.sequence = 12
         self.nodes.p9.save()
 
@@ -901,7 +897,7 @@ class NodeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_sibling_node_to_be_last(self):
-        edge = self.nodes.p1.add_child(self.nodes.p9)
+        self.nodes.p1.add_child(self.nodes.p9)
         self.nodes.p9.sequence = 2
         self.nodes.p9.save()
 
@@ -931,7 +927,7 @@ class NodeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_between_parents_before(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p2.add_child(self.nodes.p9)
         self.nodes.p9.sequence = 12
         self.nodes.p9.save()
 
@@ -958,7 +954,7 @@ class NodeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_before_a_sibling(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p2.add_child(self.nodes.p9)
         self.nodes.p9.sequence = 12
         self.nodes.p9.save()
 
@@ -977,7 +973,7 @@ class NodeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_before_a_sibling_quickapi(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p2.add_child(self.nodes.p9)
         self.nodes.p9.sequence = 12
         self.nodes.p9.save()
 
@@ -994,7 +990,7 @@ class NodeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_between_parents_after(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p2.add_child(self.nodes.p9)
         self.nodes.p9.sequence = 12
         self.nodes.p9.save()
 
@@ -1021,7 +1017,7 @@ class NodeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_after_a_sibling(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p2.add_child(self.nodes.p9)
         self.nodes.p9.sequence = 12
         self.nodes.p9.save()
 
@@ -1040,7 +1036,7 @@ class NodeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_after_a_sibling_quickapi(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p2.add_child(self.nodes.p9)
         self.nodes.p9.sequence = 12
         self.nodes.p9.save()
 
@@ -1057,7 +1053,7 @@ class NodeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_between_parents_beforestart(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p2.add_child(self.nodes.p9)
         self.nodes.p9.sequence = 12
         self.nodes.p9.save()
 
@@ -1084,7 +1080,7 @@ class NodeSortedDagRelationshipTests(TestCase):
         )
 
     def test_can_move_a_node_between_parents_afterend(self):
-        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p2.add_child(self.nodes.p9)
         self.nodes.p9.sequence = 12
         self.nodes.p9.save()
 

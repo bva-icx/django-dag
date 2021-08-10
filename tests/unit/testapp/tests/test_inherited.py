@@ -1,15 +1,10 @@
-import multiprocessing
 import unittest
-
 from django.test import TestCase
-from django.core.exceptions import ValidationError
-from .tree_test_output import expected_tree_output
 from ..models.inherited import (
     BaseDerivedNode, DerivedNodeA, DerivedNodeB, DerivedEdge,
-    ConcreteBaseNode, InheritedConcreteNode, InheritedConcreteEdge,
+    InheritedConcreteNode, InheritedConcreteEdge,
     InheritedAbstractNode, InheritedAbstractEdge
 )
-from django_dag.exceptions import NodeNotReachableException
 from .test_basic import DagStructureTests
 
 

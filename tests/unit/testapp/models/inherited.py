@@ -16,8 +16,8 @@ class AbstractBaseNode(Model):
 class InheritedAbstractNode(
     node_factory(
         'InheritedAbstractEdge',
-        base_model=AbstractBaseNode,
-    )):
+        base_model=AbstractBaseNode)
+):
     """
     Simple Test Node with name field
     """
@@ -51,8 +51,8 @@ class ConcreteBaseNode(Model):
 class InheritedConcreteNode(
     node_factory(
         'InheritedConcreteEdge',
-        base_model=ConcreteBaseNode,
-    )):
+        base_model=ConcreteBaseNode)
+):
     """
     Simple Test Node with name field
     """
@@ -80,9 +80,8 @@ class InheritedConcreteEdge(edge_factory(InheritedConcreteNode, concrete=False))
 
 
 class BaseDerivedNode(
-    node_factory(
-        'DerivedEdge',
-    )):
+    node_factory('DerivedEdge',)
+):
     """
     Simple Test Node with name field
     """

@@ -1,5 +1,5 @@
 
-from django.db.models import CharField, Model
+from django.db.models import CharField
 from django_dag.models import node_factory, edge_factory
 
 ################################################################

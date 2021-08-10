@@ -1,25 +1,17 @@
-from django.db import models, connection
-from django.core.exceptions import ValidationError
+from django.db import models
 from django.db.models.functions import (
     Cast,
     Concat,
-    Left,
     LPad,
     StrIndex,
     Substr,
-    RowNumber
 )
 from django.db.models.expressions import (
-    Case,
     ExpressionWrapper,
     F,
     Value,
-    When,
-    Window,
-    Q,
 )
 from django.db.models.query import EmptyQuerySet
-from django.db.models import FilteredRelation
 from django.db.models import Exists, OuterRef, Subquery
 from django.db.models import Max
 from django_dag.exceptions import NodeNotReachableException
@@ -89,8 +81,6 @@ class ProtoNodeQuerySet(CTEQuerySet):
             sort_name='sort', sequence_field=None):
         path_filedname = QUERY_PATH_FIELDNAME_FORMAT % {'name': sort_name, }
         node_model = self.model.get_node_model()
-        edge_model = self.model.get_edge_model()
-        result_model = edge_model
 
         if isinstance(self, EmptyQuerySet):
             return self.annotate(**{
@@ -215,7 +205,7 @@ class ProtoNode(BaseNode):
         # NOTE: This is less then ideall as ATM you cannot join with (or |) cte queries
         ancestors = list(self.ancestors.values_list('pk', flat=True))
         descendants = list(self.descendants.values_list('pk', flat=True))
-        return self.get_node_model().objects.filter(pk__in=[self.pk]+ancestors+descendants)
+        return self.get_node_model().objects.filter(pk__in=[self.pk] + ancestors + descendants)
 
     @classmethod
     def _base_tree_cte_builder(cls, local_name, link_name, result_spec,
@@ -309,7 +299,7 @@ class ProtoNode(BaseNode):
         try:
             if downwards is None or downwards is True:
                 return list(self._get_path_edge_cte(target, use_edges=use_edges, downwards=True))
-        except NodeNotReachableException as err:
+        except NodeNotReachableException as err:  # noqa: F841
             if downwards is True:
                 raise
         return list(self._get_path_edge_cte(target, use_edges=use_edges, downwards=False))
@@ -362,6 +352,7 @@ class ProtoNode(BaseNode):
                 item_group=orderlists_cte.col.item_group,
         ) \
             .order_by('item_group', 'item_order')
+        # .order_by(node_paths_cte.col.depth, node_paths_cte.col.cid)
 
         # Convert to list groups
         group = None

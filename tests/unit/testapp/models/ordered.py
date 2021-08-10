@@ -1,6 +1,5 @@
-from django.db.models import CharField, Model
+from django.db.models import CharField
 from django_dag.models import node_factory, edge_factory
-
 from .ordersort import DagEdgeIntSorter, DagNodeIntSorter
 
 
@@ -13,7 +12,7 @@ class OrderedEdge(edge_factory(
         'EdgeOrderedNode',
         concrete=False,
         ordering=DagEdgeIntSorter(),
-    )):
+)):
     """
     Test Edge which support return the edge on save
     """
@@ -35,8 +34,8 @@ class OrderedEdge(edge_factory(
 
 class EdgeOrderedNode(node_factory(
         OrderedEdge,
-        ordering = DagEdgeIntSorter(),
-    )):
+        ordering=DagEdgeIntSorter(),
+)):
     """
     Simple Test node for Edge Save Support
     """
@@ -52,11 +51,10 @@ class EdgeOrderedNode(node_factory(
 ################################################################
 # A Dag in which all nodes have an implicit ordered.
 # ie the order is part of the node no the edge
-
 class OrderedNode(node_factory(
         'NodeOrderedEdge',
-        ordering = DagNodeIntSorter(),
-    )):
+        ordering=DagNodeIntSorter(),
+)):
     """
     Simple Test node for Edge Save Support
     """
@@ -68,11 +66,12 @@ class OrderedNode(node_factory(
     class Meta:
         app_label = 'testapp'
 
+
 class NodeOrderedEdge(edge_factory(
         'OrderedNode',
         concrete=False,
         ordering=DagNodeIntSorter(),
-    )):
+)):
     """
     Test Edge which support return the edge on save
     """

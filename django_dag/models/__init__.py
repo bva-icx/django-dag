@@ -19,7 +19,7 @@ backend = import_module(module_name)
 BaseNodeManager = backend.ProtoNodeManager
 BaseEdgeManager = backend.ProtoEdgeManager
 
-from .query import BaseNodeQuerySet, BaseEdgeQuerySet, DagSortOrder
+from .query import BaseNodeQuerySet, BaseEdgeQuerySet, DagSortOrder  # noqa: E402
 
 __all__ = [
     "edge_manager_factory",
@@ -71,16 +71,16 @@ def edge_manager_factory(base_manager_class, ordering=None):
     return EdgeManager
 
 
-def edge_factory( node_model,
-        child_to_field = None,
-        parent_to_field = None,
-        ordering = False,
-        concrete = True,
-        base_model = models.Model,
-        manager = None,
-        queryset = BaseEdgeQuerySet,
-        related_name_base = ''
-    ):
+def edge_factory(node_model,
+                 child_to_field=None,
+                 parent_to_field=None,
+                 ordering=False,
+                 concrete=True,
+                 base_model=models.Model,
+                 manager=None,
+                 queryset=BaseEdgeQuerySet,
+                 related_name_base=''
+                 ):
     """
     Dag Edge factory
     """
@@ -128,6 +128,7 @@ def edge_factory( node_model,
             # Call the "real" save() method.
             super(Edge, self).save(*args, **kwargs)
 
+    # BASE_EDGE_TYPES.append(Edge)
     return Edge
 
 
@@ -186,14 +187,14 @@ def node_manager_factory(base_manager_class, ordering=None, ):
     return NodeManager
 
 
-def node_factory( edge_model,
-        children_null = True,
-        base_model = models.Model,
-        field = models.ManyToManyField,
-        ordering = False,
-        manager = None,
-        queryset = BaseNodeQuerySet,
-    ):
+def node_factory(edge_model,
+                 children_null=True,
+                 base_model=models.Model,
+                 field=models.ManyToManyField,
+                 ordering=False,
+                 manager=None,
+                 queryset=BaseNodeQuerySet,
+                 ):
     """Dag Node factory"""
 
     node_manager = node_manager_factory(
@@ -219,6 +220,5 @@ def node_factory( edge_model,
             sequence_manager = ordering
         else:
             sequence_manager = None
-
 
     return Node

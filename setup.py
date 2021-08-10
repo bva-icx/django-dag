@@ -17,11 +17,13 @@ classifiers = [
     "Framework :: Django",
 ]
 
+
 def root_dir():
     try:
         return os.path.dirname(__file__)
     except NameError:
         return '.'
+
 
 long_desc = open(os.path.join(root_dir(), 'README')).read()
 install_requires = [
@@ -29,7 +31,8 @@ install_requires = [
     "deprecated"
 ]
 
-setup_args=dict(
+
+setup_args = dict(
     name='django-dag',
     version=version,
     url='https://github.com/elpaso/django-dag',
@@ -41,9 +44,9 @@ setup_args=dict(
     description='Directed Acyclic Graph implementation for Django 2+',
     classifiers=classifiers,
     long_description=long_desc,
-    install_requires= install_requires
+    install_requires=install_requires
 )
 
 
 if __name__ == '__main__':
-     setup(**setup_args)
+    setup(**setup_args)

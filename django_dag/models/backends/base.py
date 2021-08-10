@@ -1,9 +1,6 @@
-from django.db import models, connection
 from django.core.exceptions import ValidationError
-from django.db.models import Case, When
 from django_dag.exceptions import (
     NodeNotReachableException,
-    InvalidNodeInsert,
     InvalidNodeMove,
 )
 
@@ -25,7 +22,8 @@ class BaseNode(object):
 
         :param parent:
         :param child:
-        :return: 
+        :return: True if there is not error
+        :raise: ValidationError
         """
         if parent == child:
             raise ValidationError('Self links are not allowed.')
@@ -148,7 +146,7 @@ class BaseNode(object):
         reversing_sign = -1 if directed else 1
         try:
             return len(self.get_paths(target, downwards=True)[0])
-        except NodeNotReachableException as err:
+        except NodeNotReachableException as err:  # noqa: F841
             pass
         return reversing_sign * len(self.get_paths(target, downwards=False)[0])
 
@@ -408,4 +406,4 @@ class BaseNode(object):
         :rtype: QuerySet<Node>
         :return:  List of query sets for each
         """
-        return self.get_paths(target,use_edges=False, downwards=True)[0]
+        return self.get_paths(target, use_edges=False, downwards=True)[0]

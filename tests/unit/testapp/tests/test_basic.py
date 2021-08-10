@@ -1,9 +1,8 @@
 import multiprocessing
 import unittest
-import functools
-
 from django.conf import settings
 from django.db.models import Max
+from django.db import models
 from django.test import TestCase
 from django.shortcuts import render
 from django.core.exceptions import ValidationError
@@ -17,7 +16,6 @@ from django_dag.models import (
     BaseNodeManager,
     DagSortOrder,
 )
-from django.db import models
 
 DJANGO_DAG_BACKEND = None
 if hasattr(settings, 'DJANGO_DAG_BACKEND'):
@@ -70,6 +68,11 @@ class DagTestCase(TestCase):
                                         )):
                 pass
 
+        # self.assertTrue(issubclass(MyModel,models.Model))
+        # self.assertTrue(issubclass(dagmodel,MyModel))
+        # self.assertTrue(isinstance(dagmodel.objects,MyManager))
+        # self.assertTrue(isinstance(dagmodel.objects.get_queryset(),MyQS))
+
     def test_objects_were_created(self):
         for i in range(1, 11):
             self.assertEqual(BasicNode.objects.get(
@@ -87,15 +90,15 @@ class DagTestCase(TestCase):
             # results for intermediate nodes need to be cached
             n = 20
 
-            for i in range(2*n):
+            for i in range(2 * n):
                 BasicNode(pk=i).save()
 
             # Create edges
-            for i in range(0, 2*n - 2, 2):
+            for i in range(0, 2 * n - 2, 2):
                 p1 = BasicNode.objects.get(pk=i)
-                p2 = BasicNode.objects.get(pk=i+1)
-                p3 = BasicNode.objects.get(pk=i+2)
-                p4 = BasicNode.objects.get(pk=i+3)
+                p2 = BasicNode.objects.get(pk=i + 1)
+                p3 = BasicNode.objects.get(pk=i + 2)
+                p4 = BasicNode.objects.get(pk=i + 3)
 
                 p1.add_child(p3)
                 p1.add_child(p4)
@@ -106,10 +109,10 @@ class DagTestCase(TestCase):
             BasicNode.objects.get(pk=0).descendants
 
             # Compute ancestors of a leaf node
-            BasicNode.objects.get(pk=2*n - 1).ancestors
+            BasicNode.objects.get(pk=2 * n - 1).ancestors
 
             BasicNode.objects.get(pk=0).add_child(
-                BasicNode.objects.get(pk=2*n - 1))
+                BasicNode.objects.get(pk=2 * n - 1))
 
         # Run the test, raising an error if the code times out
         p = multiprocessing.Process(target=run_test)
@@ -375,7 +378,7 @@ class DagStructureTests(TestCase):
         self.assertEqual(paths[0][0], self.nodes.p11)
 
     def test_path_raise_for_unattached_nodes(self,):
-        with self.assertRaises(NodeNotReachableException) as add_err_cm:
+        with self.assertRaises(NodeNotReachableException) as add_err_cm:  # noqa: F841
             self.nodes.p7.get_paths(self.nodes.p10)
 
     def test_path_for_same_node_is_empty_list(self,):

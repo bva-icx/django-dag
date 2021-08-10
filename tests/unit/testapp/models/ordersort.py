@@ -2,6 +2,7 @@
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.db.models import OuterRef, Subquery
+from django.core.exceptions import ObjectDoesNotExist
 from django_dag.models.order_control import (
     BaseDagNodeOrderController,
     BaseDagEdgeOrderController
@@ -28,7 +29,7 @@ class DagNodeIntSorter(BaseDagNodeOrderController):
         Return a key half way between this and other - assuming no other
         intermediate keys exist in the tree.
         """
-        return int(instance.sequence + (other.sequence - instance.sequence)/2)
+        return int(instance.sequence + (other.sequence - instance.sequence) / 2)
 
     def next_key(self, instance, parent):
         """
@@ -130,10 +131,11 @@ class DagEdgeIntSorter(BaseDagEdgeOrderController):
         edges = instance.children.through.objects.filter(
             parent=parent,
             child__in=[instance, other]
-        ).order_by(self.sequence_field_name).values_list(self.sequence_field_name, flat=True)
-        assert len(
-            edges) == 2, "We only support one noe connecting parent to child"
-        return int(edges[0] + (edges[1] - edges[0])/2)
+        ) \
+            .order_by(self.sequence_field_name) \
+            .values_list(self.sequence_field_name, flat=True)
+        assert len(edges) == 2, "We only support one noe connecting parent to child"
+        return int(edges[0] + (edges[1] - edges[0]) / 2)
 
     def next_key(self, instance, parent):
         """
