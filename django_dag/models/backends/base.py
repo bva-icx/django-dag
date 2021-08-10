@@ -1,7 +1,11 @@
 from django.db import models, connection
 from django.core.exceptions import ValidationError
 from django.db.models import Case, When
-from django_dag.exceptions import NodeNotReachableException
+from django_dag.exceptions import (
+    NodeNotReachableException,
+    InvalidNodeInsert,
+    InvalidNodeMove,
+)
 
 from deprecated.sphinx import deprecated
 
@@ -90,6 +94,13 @@ class BaseNode(object):
         """
         kwargs.update({'parent' : self, 'child' : descendant })
         disable_check = kwargs.pop('disable_circular_check', False)
+
+        if self.sequence_manager and self.sequence_manager.get_node_sequence_field():
+            sequencename = self.sequence_manager.sequence_field_name
+            sequence = kwargs.pop(sequencename, None)
+            if sequence:
+                setattr(descendant, sequencename, sequence)
+                descendant.save()
         cls = self.children.through(**kwargs)
         return cls.save(disable_circular_check=disable_check)
 
@@ -282,7 +293,13 @@ class BaseNode(object):
             descendant, self, after, **kwargs)
 
     def insert_child(self, descendant, position, **kwargs):
-        return self.sequence_manager.insert_child_after(
+        """
+        Adds a node to the current node as a child directly in the psotion
+        specified.
+
+        :param position: `class:Position`
+        """
+        return self.sequence_manager.insert_child(
             descendant, self, position, **kwargs)
 
     def move_child_before(self, descendant, before, **kwargs):
@@ -333,13 +350,20 @@ class BaseNode(object):
         :param destination_sibling: The node final sibing or None
         :param position: `class:Position` or None
         """
-        edge = origin_parent.get_edge_model().objects \
-            .filter(
-                parent_id = origin_parent.pk,
-                child_id = self.pk
+        edge = None
+        if origin_parent:
+            edge = origin_parent.get_edge_model().objects \
+                .filter(
+                    parent_id=origin_parent.pk,
+                    child_id=self.pk
             ).first()
+        elif destination_parent and position:
+            return destination_parent.insert_child(
+                self, position
+            )
+
         if edge is None:
-            raise exceptions.InvalidNodeMode()
+            raise InvalidNodeMove()
         destination_parent.circular_checker(destination_parent, self)
 
         if self.sequence_manager:
@@ -383,5 +407,4 @@ class BaseNode(object):
         :rtype: QuerySet<Node>
         :return:  List of query sets for each
         """
-        return self.get_paths(target,
-                use_edges=False, downwards=True)[0]
+        return self.get_paths(target,use_edges=False, downwards=True)[0]

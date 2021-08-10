@@ -190,7 +190,7 @@ class BaseDagOrderController():
         else:
             before = after.get_prev_sibling(parent_node)
             if before:
-                sequence =self.key_between(after, before, parent_node)
+                sequence = self.key_between(after, before, parent_node)
             else:
                 sequence = self.prev_key(after, parent_node)
 
@@ -201,7 +201,7 @@ class BaseDagOrderController():
         else:
             setattr(descendant, self.sequence_field_name, sequence)
             descendant.save()
-        return parent_node.add_child( descendant, **kwargs)
+        return parent_node.add_child(descendant, **kwargs)
 
     def insert_child_after(self, descendant, parent_node, before, **kwargs):
         """
@@ -242,6 +242,10 @@ class BaseDagOrderController():
         """
         if parent_node.children.filter(id__in = [before.pk, descendant.pk]).count() != 2:
             raise exceptions.InvalidNodeMove()
+        return self.move_node(
+            descendant, parent_node, parent_node, before,
+            position=Position.BEFORE)
+
 
     def move_child_after(self, descendant, parent_node, after, **kwargs):
         """
@@ -258,6 +262,9 @@ class BaseDagOrderController():
         # Check both are siblings of parent
         if parent_node.children.filter(id__in = [after.pk, descendant.pk]).count() != 2:
             raise exceptions.InvalidNodeMove()
+        return self.move_node(
+            descendant, parent_node, parent_node, after,
+            position=Position.AFTER)
 
     def insert_child(self, descendant, parent_node, position, **kwargs):
         """
@@ -269,9 +276,9 @@ class BaseDagOrderController():
         if position == Position.FIRST:
             insert_before = parent_node.get_first_child()
             return self.insert_child_before(descendant, parent_node, insert_before)
-        elif position == Position.Last:
+        elif position == Position.LAST:
             insert_after = parent_node.get_last_child()
-            return self.insert_child_before(descendant, parent_node, insert_after)
+            return self.insert_child_after(descendant, parent_node, insert_after)
         else:
             raise exceptions.InvalidNodeInsert()
 
@@ -293,15 +300,35 @@ class BaseDagOrderController():
         """
         sequence = None
         if destination_sibling is None:
-            sequence = self.initial_key()
+            if position in [Position.BEFORE, Position.AFTER]:
+                raise exceptions.InvalidNodeMove()
+
+            if position == Position.FIRST:
+                other_sibling = destination_parent.get_first_child()
+                if other_sibling is not None:
+                    sequence = self.prev_key(other_sibling, destination_parent)
+
+            elif position == Position.LAST or position is None:
+                other_sibling = destination_parent.get_last_child()
+                if other_sibling is not None:
+                    sequence = self.next_key(other_sibling, destination_parent)
+
+            else:
+                raise exceptions.InvalidNodeMove()
+
+            if other_sibling == descendant:
+                return
+            if sequence is None:
+                sequence = self.initial_key()
+
         else:
             other_sibling = None
             if position == Position.BEFORE:
                 other_sibling = self.get_prev_sibling(
                     destination_sibling, destination_parent)
                 if other_sibling:
-                    sequence = self.key_between(other_sibling, destination_sibling,
-                        destination_parent)
+                    sequence = self.key_between(
+                        other_sibling, destination_sibling, destination_parent)
             if position == Position.FIRST or (
                 position == Position.BEFORE and not sequence
             ):
@@ -309,15 +336,17 @@ class BaseDagOrderController():
                     destination_sibling, destination_parent)
                 if other_sibling:
                     sequence = self.prev_key(other_sibling, destination_parent)
+                else:
+                    raise exceptions.InvalidNodeMove()
 
             if position == Position.AFTER:
                 other_sibling = self.get_next_sibling(
                     destination_sibling, destination_parent)
                 if other_sibling:
-                    sequence = self.key_between(destination_sibling, other_sibling,
-                        destination_parent)
+                    sequence = self.key_between(
+                        destination_sibling, other_sibling, destination_parent)
             if position == Position.LAST or (
-                position is None ) or (
+                position is None) or (
                 position == Position.AFTER and not sequence
             ):
                 other_sibling = self.get_last_sibling(
@@ -326,9 +355,9 @@ class BaseDagOrderController():
                     sequence = self.next_key(other_sibling, destination_parent)
 
         assert sequence is not None
-        kwargs.update({ self.sequence_field_name: sequence })
-        return self._move_node(descendant, origin_parent, destination_parent,
-            **kwargs)
+        kwargs.update({self.sequence_field_name: sequence})
+        return self._move_node(
+            descendant, origin_parent, destination_parent, **kwargs)
 
 
 class BaseDagNodeOrderController(BaseDagOrderController):
@@ -398,12 +427,12 @@ class BaseDagNodeOrderController(BaseDagOrderController):
         edge = origin_parent.get_edge_model().objects \
             .filter(
                 parent_id = origin_parent.pk,
-                child_id = self.pk
+                child_id = descendant.pk
             ).first()
         with transaction.atomic():
             setattr(descendant, self.sequence_field_name, kwargs.pop(self.sequence_field_name))
             edge.parent_id = destination_parent.pk
-            node.save()
+            descendant.save()
             return edge.save()
 
 

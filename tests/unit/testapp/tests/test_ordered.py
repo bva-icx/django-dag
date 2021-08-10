@@ -1,3 +1,4 @@
+from django_dag.models.order_control import Position
 import multiprocessing
 import unittest
 
@@ -8,7 +9,7 @@ from .tree_test_output import expected_tree_output
 from ..models.ordered import EdgeOrderedNode, OrderedEdge
 from ..models.ordered import OrderedNode, NodeOrderedEdge
 
-from django_dag.exceptions import NodeNotReachableException
+from django_dag.exceptions import InvalidNodeMove
 from django_dag.models import DagSortOrder
 
 DJANGO_DAG_BACKEND = None
@@ -324,24 +325,282 @@ class EdgeSortedDagRelationshipTests(TestCase):
         self.assertEqual(
             self.nodes.p5.get_prev_sibling(self.nodes.p2), None)
 
-    @unittest.skip('todo')
-    def test_cannot_move_a_node_between_parents_causing_circular_ref():
-        pass
+    def test_cannot_move_a_node_between_parents_causing_circular_ref(self):
+        edge = self.nodes.p5.add_child(self.nodes.p9, sequence=12)
+        with self.assertRaises(InvalidNodeMove):
+            self.nodes.p1.move_node(
+                None,
+                self.nodes.p9,
+            )
 
-    @unittest.skip('todo')
-    def test_can_move_a_node_between_parents():
-        pass
-        #first, last
+    def test_can_move_a_node_between_parents_default_location(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p2.pk]
+        )
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p1,
+        )
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p1.pk]
+        )
 
-    @unittest.skip('todo')
-    def test_can_move_a_node_relative_to_a_sibling_same_parent():
-        pass
-        #before, after, last, fist
+    def test_can_move_a_node_between_parents_first(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p2.pk]
+        )
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p1,
+            position=Position.FIRST
+        )
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p1.pk]
+        )
+        self.assertEqual(
+            self.nodes.p1.children
+                .with_sequence().order_by('sequence')
+                .values_list('pk', flat=True).first(),
+            self.nodes.p9.pk
+        )
 
-    @unittest.skip('todo')
-    def test_can_move_a_node_relative_to_a_sibling_difernt_parent():
-        pass
-        #before, after, last, fist
+    def test_can_move_a_sibling_node_to_be_first(self):
+        edge = self.nodes.p1.add_child(self.nodes.p9, sequence=14)
+        self.nodes.p9.move_node(
+            self.nodes.p1,
+            self.nodes.p1,
+            position=Position.FIRST
+        )
+        self.assertEqual(
+            self.nodes.p1.children
+                .with_sequence().order_by('sequence')
+                .values_list('pk', flat=True).first(),
+            self.nodes.p9.pk
+        )
+
+    def test_can_move_a_root_node_to_be_firstchild_of_another_node(self):
+        self.nodes.p9.move_node(
+            None,
+            self.nodes.p1,
+            position=Position.FIRST
+        )
+        self.assertEqual(
+            self.nodes.p1.children
+                .with_sequence().order_by('sequence')
+                .values_list('pk', flat=True).first(),
+            self.nodes.p9.pk
+        )
+
+    def test_can_move_a_node_between_parents_last(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p2.pk]
+        )
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p1,
+            position=Position.LAST
+        )
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p1.pk]
+        )
+        self.assertEqual(
+            self.nodes.p1.children
+                .with_sequence().order_by('sequence')
+                .values_list('pk', flat=True).last(),
+            self.nodes.p9.pk
+        )
+
+    def test_can_move_a_sibling_node_to_be_last(self):
+        edge = self.nodes.p1.add_child(self.nodes.p9, sequence=2)
+        self.nodes.p9.move_node(
+            self.nodes.p1,
+            self.nodes.p1,
+            position=Position.LAST
+        )
+        self.assertEqual(
+            self.nodes.p1.children
+                .with_sequence().order_by('sequence')
+                .values_list('pk', flat=True).last(),
+            self.nodes.p9.pk
+        )
+
+    def test_can_move_a_root_node_to_be_lastchild_of_another_node(self):
+        self.nodes.p9.move_node(
+            None,
+            self.nodes.p1,
+            position=Position.LAST
+        )
+        self.assertEqual(
+            self.nodes.p1.children
+                .with_sequence().order_by('sequence')
+                .values_list('pk', flat=True).last(),
+            self.nodes.p9.pk
+        )
+
+    def test_can_move_a_node_between_parents_before(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p2.pk]
+        )
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p1,
+            destination_sibling=self.nodes.p6,
+            position=Position.BEFORE
+        )
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p1.pk]
+        )
+        self.assertEqual(
+            list(self.nodes.p1.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p7.pk, self.nodes.p9.pk,
+                self.nodes.p6.pk, self.nodes.p5.pk]
+        )
+
+    def test_can_move_a_node_before_a_sibling(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p2,
+            destination_sibling=self.nodes.p7,
+            position=Position.BEFORE
+        )
+        self.assertEqual(
+            list(self.nodes.p2.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p5.pk, self.nodes.p9.pk,
+                self.nodes.p7.pk, self.nodes.p6.pk]
+        )
+
+    def test_can_move_a_node_before_a_sibling_quickapi(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p2.move_child_before(
+            self.nodes.p9,
+            self.nodes.p7,
+        )
+        self.assertEqual(
+            list(self.nodes.p2.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p5.pk, self.nodes.p9.pk,
+                self.nodes.p7.pk, self.nodes.p6.pk]
+        )
+
+    def test_can_move_a_node_between_parents_after(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p2.pk]
+        )
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p1,
+            destination_sibling=self.nodes.p6,
+            position=Position.AFTER
+        )
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p1.pk]
+        )
+        self.assertEqual(
+            list(self.nodes.p1.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p7.pk, self.nodes.p6.pk,
+                self.nodes.p9.pk, self.nodes.p5.pk]
+        )
+
+    def test_can_move_a_node_after_a_sibling(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p2,
+            destination_sibling=self.nodes.p7,
+            position=Position.AFTER
+        )
+        self.assertEqual(
+            list(self.nodes.p2.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p5.pk, self.nodes.p7.pk,
+                self.nodes.p9.pk, self.nodes.p6.pk]
+        )
+
+    def test_can_move_a_node_after_a_sibling_quickapi(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.nodes.p2.move_child_after(
+            self.nodes.p9,
+            self.nodes.p7,
+        )
+        self.assertEqual(
+            list(self.nodes.p2.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p5.pk, self.nodes.p7.pk,
+                self.nodes.p9.pk, self.nodes.p6.pk]
+        )
+
+    def test_can_move_a_node_between_parents_beforestart(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p2.pk]
+        )
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p1,
+            destination_sibling=self.nodes.p7,
+            position=Position.BEFORE
+        )
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p1.pk]
+        )
+        self.assertEqual(
+            list(self.nodes.p1.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p9.pk, self.nodes.p7.pk,
+                self.nodes.p6.pk, self.nodes.p5.pk]
+        )
+
+    def test_can_move_a_node_between_parents_afterend(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9, sequence=12)
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p2.pk]
+        )
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p1,
+            destination_sibling=self.nodes.p5,
+            position=Position.AFTER
+        )
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p1.pk]
+        )
+        self.assertEqual(
+            list(self.nodes.p1.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p7.pk, self.nodes.p6.pk,
+                self.nodes.p5.pk, self.nodes.p9.pk]
+        )
 
 
 class NodeSortedDagRelationshipTests(TestCase):
@@ -375,6 +634,15 @@ class NodeSortedDagRelationshipTests(TestCase):
         for k, n in self.nodes.__dict__.items():
             if k.startswith('p'):
                 n.save()
+
+    def test_can_add_and_set_sequence(self):
+        self.nodes.p1.add_child(self.nodes.p9, sequence=7)
+        self.assertEqual(
+            list(self.nodes.p1.children \
+                .with_sequence().order_by('sequence') \
+                .values_list('pk', flat=True)),
+            [ self.nodes.p5.pk, self.nodes.p4.pk, self.nodes.p9.pk, self.nodes.p3.pk]
+        )
 
     def test_queryset_sortting_filter(self):
         for i in range(10, 16):
@@ -470,36 +738,36 @@ class NodeSortedDagRelationshipTests(TestCase):
         self.assertEqual(self.nodes.p2.get_last_child(), self.nodes.p7)
 
     def test_can_get_first_parent_of_node(self):
-        self.nodes.p1.sequence=10
-        self.nodes.p9.sequence=1
+        self.nodes.p1.sequence = 10
+        self.nodes.p9.sequence = 1
         self.nodes.p1.save()
         self.nodes.p9.save()
 
         self.nodes.p9.add_child(self.nodes.p4)
         self.assertEqual(self.nodes.p4.get_first_parent(), self.nodes.p9)
-        self.nodes.p9.sequence=20
+        self.nodes.p9.sequence = 20
         self.nodes.p9.save()
         self.assertEqual(self.nodes.p4.get_first_parent(), self.nodes.p1)
         self.assertEqual(
             self.nodes.p4.get_first_parent(),
             self.nodes.p4.parents.with_sequence().order_by('sequence').first(),
-            )
+        )
 
     def test_can_get_last_parent_of_node(self):
-        self.nodes.p1.sequence=10
-        self.nodes.p9.sequence=1
+        self.nodes.p1.sequence = 10
+        self.nodes.p9.sequence = 1
         self.nodes.p1.save()
         self.nodes.p9.save()
 
         self.nodes.p9.add_child(self.nodes.p4)
         self.assertEqual(self.nodes.p4.get_last_parent(), self.nodes.p1)
-        self.nodes.p9.sequence=20
+        self.nodes.p9.sequence = 20
         self.nodes.p9.save()
         self.assertEqual(self.nodes.p4.get_last_parent(), self.nodes.p9)
         self.assertEqual(
             self.nodes.p4.get_last_parent(),
             self.nodes.p4.parents.with_sequence().order_by('sequence').last(),
-            )
+        )
 
     def test_can_get_next_sibling_of_node(self):
         self.assertEqual(
@@ -523,21 +791,319 @@ class NodeSortedDagRelationshipTests(TestCase):
         self.assertEqual(
             self.nodes.p6.get_prev_sibling(self.nodes.p2), None)
 
-    @unittest.skip('todo')
-    def test_cannot_move_a_node_between_parents_causing_circular_ref():
-        pass
+    def test_cannot_move_a_node_between_parents_causing_circular_ref(self):
+        edge = self.nodes.p3.add_child(self.nodes.p9)
+        self.nodes.p9.sequence = 12
+        self.nodes.p9.save()
+        with self.assertRaises(InvalidNodeMove):
+            self.nodes.p1.move_node(
+                None,
+                self.nodes.p9,
+            )
 
-    @unittest.skip('todo')
-    def test_can_move_a_node_between_parents():
-        pass
-        #first, last
+    def test_can_move_a_node_between_parents_default_location(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p9.sequence = 12
+        self.nodes.p9.save()
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p2.pk]
+        )
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p1,
+        )
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p1.pk]
+        )
 
-    @unittest.skip('todo')
-    def test_can_move_a_node_relative_to_a_sibling_same_parent():
-        pass
-        #before, after, last, fist
+    def test_can_move_a_node_between_parents_first(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p9.sequence = 12
+        self.nodes.p9.save()
 
-    @unittest.skip('todo')
-    def test_can_move_a_node_relative_to_a_sibling_difernt_parent():
-        pass
-        #before, after, last, fist
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p2.pk]
+        )
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p1,
+            position=Position.FIRST
+        )
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p1.pk]
+        )
+        self.assertEqual(
+            self.nodes.p1.children
+                .with_sequence().order_by('sequence')
+                .values_list('pk', flat=True).first(),
+            self.nodes.p9.pk
+        )
+
+    def test_can_move_a_sibling_node_to_be_first(self):
+        edge = self.nodes.p1.add_child(self.nodes.p9)
+        self.nodes.p9.sequence = 14
+        self.nodes.p9.save()
+
+        self.nodes.p9.move_node(
+            self.nodes.p1,
+            self.nodes.p1,
+            position=Position.FIRST
+        )
+        self.assertEqual(
+            self.nodes.p1.children
+                .with_sequence().order_by('sequence')
+                .values_list('pk', flat=True).first(),
+            self.nodes.p9.pk
+        )
+
+    def test_can_move_a_root_node_to_be_firstchild_of_another_node(self):
+        self.nodes.p9.move_node(
+            None,
+            self.nodes.p1,
+            position=Position.FIRST
+        )
+        self.assertEqual(
+            self.nodes.p1.children
+                .with_sequence().order_by('sequence')
+                .values_list('pk', flat=True).first(),
+            self.nodes.p9.pk
+        )
+
+    def test_can_move_a_node_between_parents_last(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p9.sequence = 12
+        self.nodes.p9.save()
+
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p2.pk]
+        )
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p1,
+            position=Position.LAST
+        )
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p1.pk]
+        )
+        self.assertEqual(
+            self.nodes.p1.children
+                .with_sequence().order_by('sequence')
+                .values_list('pk', flat=True).last(),
+            self.nodes.p9.pk
+        )
+
+    def test_can_move_a_sibling_node_to_be_last(self):
+        edge = self.nodes.p1.add_child(self.nodes.p9)
+        self.nodes.p9.sequence = 2
+        self.nodes.p9.save()
+
+        self.nodes.p9.move_node(
+            self.nodes.p1,
+            self.nodes.p1,
+            position=Position.LAST
+        )
+        self.assertEqual(
+            self.nodes.p1.children
+                .with_sequence().order_by('sequence')
+                .values_list('pk', flat=True).last(),
+            self.nodes.p9.pk
+        )
+
+    def test_can_move_a_root_node_to_be_lastchild_of_another_node(self):
+        self.nodes.p9.move_node(
+            None,
+            self.nodes.p1,
+            position=Position.LAST
+        )
+        self.assertEqual(
+            self.nodes.p1.children
+                .with_sequence().order_by('sequence')
+                .values_list('pk', flat=True).last(),
+            self.nodes.p9.pk
+        )
+
+    def test_can_move_a_node_between_parents_before(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p9.sequence = 12
+        self.nodes.p9.save()
+
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p2.pk]
+        )
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p1,
+            destination_sibling=self.nodes.p4,
+            position=Position.BEFORE
+        )
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p1.pk]
+        )
+        self.assertEqual(
+            list(self.nodes.p1.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p5.pk, self.nodes.p9.pk,
+                self.nodes.p4.pk, self.nodes.p3.pk]
+        )
+
+    def test_can_move_a_node_before_a_sibling(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p9.sequence = 12
+        self.nodes.p9.save()
+
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p2,
+            destination_sibling=self.nodes.p7,
+            position=Position.BEFORE
+        )
+        self.assertEqual(
+            list(self.nodes.p2.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p6.pk, self.nodes.p8.pk,
+                self.nodes.p9.pk, self.nodes.p7.pk]
+        )
+
+    def test_can_move_a_node_before_a_sibling_quickapi(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p9.sequence = 12
+        self.nodes.p9.save()
+
+        self.nodes.p2.move_child_before(
+            self.nodes.p9,
+            self.nodes.p7,
+        )
+        self.assertEqual(
+            list(self.nodes.p2.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p6.pk, self.nodes.p8.pk,
+                self.nodes.p9.pk, self.nodes.p7.pk]
+        )
+
+    def test_can_move_a_node_between_parents_after(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p9.sequence = 12
+        self.nodes.p9.save()
+
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p2.pk]
+        )
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p1,
+            destination_sibling=self.nodes.p4,
+            position=Position.AFTER
+        )
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p1.pk]
+        )
+        self.assertEqual(
+            list(self.nodes.p1.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p5.pk, self.nodes.p4.pk,
+                self.nodes.p9.pk, self.nodes.p3.pk]
+        )
+
+    def test_can_move_a_node_after_a_sibling(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p9.sequence = 12
+        self.nodes.p9.save()
+
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p2,
+            destination_sibling=self.nodes.p8,
+            position=Position.AFTER
+        )
+        self.assertEqual(
+            list(self.nodes.p2.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p6.pk, self.nodes.p8.pk,
+                self.nodes.p9.pk, self.nodes.p7.pk]
+        )
+
+    def test_can_move_a_node_after_a_sibling_quickapi(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p9.sequence = 12
+        self.nodes.p9.save()
+
+        self.nodes.p2.move_child_after(
+            self.nodes.p9,
+            self.nodes.p8,
+        )
+        self.assertEqual(
+            list(self.nodes.p2.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p6.pk, self.nodes.p8.pk,
+                self.nodes.p9.pk, self.nodes.p7.pk]
+        )
+
+    def test_can_move_a_node_between_parents_beforestart(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p9.sequence = 12
+        self.nodes.p9.save()
+
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p2.pk]
+        )
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p1,
+            destination_sibling=self.nodes.p5,
+            position=Position.BEFORE
+        )
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p1.pk]
+        )
+        self.assertEqual(
+            list(self.nodes.p1.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p9.pk, self.nodes.p5.pk,
+                self.nodes.p4.pk, self.nodes.p3.pk]
+        )
+
+    def test_can_move_a_node_between_parents_afterend(self):
+        edge = self.nodes.p2.add_child(self.nodes.p9)
+        self.nodes.p9.sequence = 12
+        self.nodes.p9.save()
+
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p2.pk]
+        )
+        self.nodes.p9.move_node(
+            self.nodes.p2,
+            self.nodes.p1,
+            destination_sibling=self.nodes.p3,
+            position=Position.AFTER
+        )
+        self.assertEqual(
+            list(self.nodes.p9.parents.values_list('pk', flat=True)),
+            [self.nodes.p1.pk]
+        )
+        self.assertEqual(
+            list(self.nodes.p1.children
+                 .with_sequence().order_by('sequence')
+                 .values_list('pk', flat=True)),
+            [self.nodes.p5.pk, self.nodes.p4.pk,
+                self.nodes.p3.pk, self.nodes.p9.pk]
+        )
