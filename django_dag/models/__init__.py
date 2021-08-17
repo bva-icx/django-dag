@@ -18,6 +18,8 @@ backend = import_module(module_name)
 
 BaseNodeManager = backend.ProtoNodeManager
 BaseEdgeManager = backend.ProtoEdgeManager
+# Support Legacy migrations
+NodeBase  = backend.ProtoNode
 
 from .query import BaseNodeQuerySet, BaseEdgeQuerySet, DagSortOrder  # noqa: E402
 
@@ -33,6 +35,7 @@ __all__ = [
     "BaseDagOrderController",
     "DagSortOrder",
 ]
+
 
 
 def _get_base_manager(base_model, base_merge_manager):
