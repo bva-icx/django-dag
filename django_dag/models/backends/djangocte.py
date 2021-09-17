@@ -11,11 +11,14 @@ from django.db.models.expressions import (
     F,
     Value,
 )
+from django.db.models.functions.window import RowNumber
 from django.db.models.query import EmptyQuerySet
 from django.db.models import Exists, OuterRef, Subquery
-from django.db.models import Max
+from django.db.models import Max, Window
 from django_dag.exceptions import NodeNotReachableException
 from django_cte import CTEQuerySet, With
+from django_delayed_union import DelayedUnionQuerySet
+from django_delayed_union.base import DelayedQuerySetMethod
 from .base import BaseNode
 
 
@@ -33,19 +36,55 @@ ProtoNodeManager = CTEManager
 ProtoEdgeManager = CTEManager
 ProtoEdgeQuerySet = CTEQuerySet
 
-QUERY_ORDER_FIELDNAME_FORMAT = 'dag_%(name)s_sequence'
 QUERY_PATH_FIELDNAME_FORMAT = 'dag_%(name)s_path'
 QUERY_DEPTH_FIELDNAME = 'dag_depth'
+QUERY_NODE_PATH = 'dag_node_path'
+
 _PATH_PADDING_SIZE = 4
+_PATH_PADDING_CHAR = '0'
+_PATH_SEPERATOR = ','
+
+
+class SplitPassthroughMethod(DelayedQuerySetMethod):
+    """
+    A modified 'Django Delayed Union' Passthrough field to support
+    dags queried with a root and child node parts
+    """
+    def __call__(self, obj, *args, **kwargs):
+        assert len(obj._querysets) == 2, "Can only work on DAG querysets"
+        main, roots = obj._querysets[:2]
+        assert kwargs.pop('roots', None) is None, "duplicate root"
+        main_clone = main._clone()
+        roots_clone = roots._clone()
+        return obj._clone([
+            getattr(main_clone, self.name)(*args, roots=roots_clone, **kwargs)
+        ])
+
+    def get_base_docstring(self):
+        return """
+        Returns a new delayed queryset with `{name}(...)`` having been called
+        on each of the component querysets.:
+        """
+
+
+class DagDelayedUnionQuerySet(DelayedUnionQuerySet):
+    with_sort_sequence = SplitPassthroughMethod()
 
 
 class ProtoNodeQuerySet(CTEQuerySet):
+    def __init__(self, *args, **kwargs):
+        self.path_seperator = _PATH_SEPERATOR
+        self.path_padding_character = _PATH_PADDING_CHAR
+        self.padding_size = _PATH_PADDING_SIZE
+        super().__init__(*args, **kwargs)
+
     def _LPad(self, value, padsize):
         return LPad(
             Cast(value, output_field=models.TextField()),
-            padsize, Value('0'))
+            padsize, Value(self.path_padding_character))
 
-    def with_top_down(self, *args, padsize=_PATH_PADDING_SIZE, **kwargs):
+    def with_top_down(self, *args,
+            padsize=_PATH_PADDING_SIZE, padchar=_PATH_PADDING_CHAR, **kwargs):
         """
         Generates a query that does a top-to-bottom traversal without regard to any
         possible (left-to-right) ordering of the nodes
@@ -53,13 +92,24 @@ class ProtoNodeQuerySet(CTEQuerySet):
         :param padsize int: Length of the field segment for each node in pits path
             to it root.
         """
-        return self._sort_query(
-            *args, padsize=padsize, sort_name='top_down', **kwargs)
+        return DagDelayedUnionQuerySet(
+                *self._sort_query(
+                    *args,
+                    padsize=padsize,
+                    padchar=padchar,
+                    sort_name='top_down',
+                    **kwargs))
 
-    def with_depth_first(self, *args, padsize=_PATH_PADDING_SIZE, **kwargs):
+    def with_depth_first(self, *args,
+            padsize=_PATH_PADDING_SIZE, padchar=_PATH_PADDING_CHAR, **kwargs):
         """
-        Generates a query that does a depth-first traversal, this account for the nodes
-        sequence ordering (left-to-right) of the nodes.
+        Generates a query that add annotations for depth-first traversal to the nodes
+
+        This account for the nodes sequence ordering (left-to-right) of the nodes and
+        allows the nodes to be sorted.
+        nodes.orderby('dag_depth_first') produces as 'preorder (Root, Left, Right)' sort
+
+        Nodes with multiple roots will be present in the results multiple time
 
         :param padsize int: Length of the field segment for each node in pits path
             to it root.
@@ -70,55 +120,80 @@ class ProtoNodeQuerySet(CTEQuerySet):
                 .get_edge_rel_sort_query_component(
                     self.model, 'child_id', 'parent_id'
                 )
-        return self._sort_query(
-            *args,
-            padsize=padsize,
-            sort_name='depth_first',
-            sequence_field=sequence_field,
-            **kwargs)
+        return DagDelayedUnionQuerySet(
+            *self._sort_query(
+                *args,
+                padsize=padsize,
+                sort_name='depth_first',
+                padchar=padchar,
+                sequence_field=sequence_field,
+                **kwargs))
 
-    def _sort_query(self, *args, padsize,
-            sort_name='sort', sequence_field=None):
+    def _sort_query(
+            self, *args,
+            padsize=_PATH_PADDING_SIZE,
+            padchar=_PATH_PADDING_CHAR,
+            sepchar=_PATH_SEPERATOR,
+            sequence_field=None,
+            sort_name='sort',
+            roots=None,
+    ):
+
+        self.padchar = padchar
         path_filedname = QUERY_PATH_FIELDNAME_FORMAT % {'name': sort_name, }
         node_model = self.model.get_node_model()
 
         if isinstance(self, EmptyQuerySet):
-            return self.annotate(**{
+            self.annotate(**{
                 path_filedname: Value(None, output_field=models.IntegerField()),
                 QUERY_DEPTH_FIELDNAME: Value(None, output_field=models.IntegerField()),
             })
 
+        if roots:
+            search_roots = self.query.model.objects.filter(
+                pk__in=Subquery(roots.model.objects.roots().values("pk"))
+            )
+        else:
+            search_roots = self.query.model.objects.filter(
+                    pk__in=Subquery(
+                        self.query.model.objects.roots().values("pk")
+                    )
+            )
+
         node_paths_cte = With.recursive(
             self._make_path_src_cte_fn(
                 node_model,
-                node_model.objects.filter(pk__in=Subquery(
-                    node_model.objects.roots().values("pk"))),
+                search_roots,
                 sequence_field if sequence_field else F('child_id'),
                 padsize
             ),
-            name='nodePaths'
+            name='nodePaths' + sort_name
         )
-        subnodes = node_paths_cte.join(
-            node_model,
-            id=node_paths_cte.col.cid,
-        ) \
+
+        joins = {
+            'id': node_paths_cte.col.cid
+        }
+        if roots:
+            joins[QUERY_NODE_PATH] = node_paths_cte.col.path
+
+        subnodes = node_paths_cte.join(self, **joins) \
             .with_cte(node_paths_cte) \
             .annotate(**{
-                path_filedname: node_paths_cte.col.path,
+                path_filedname: node_paths_cte.col.querypath,
+                QUERY_NODE_PATH: node_paths_cte.col.path,
                 QUERY_DEPTH_FIELDNAME: node_paths_cte.col.depth,
+            })
 
-            }).filter(
-                pk__in=Subquery(self.values("pk"))
-        )
-        roots = self.roots() \
+        if roots is None:
+            roots = self.roots()
+
+        roots = roots \
             .annotate(**{
                 path_filedname: self._LPad(F('id'), padsize),
+                QUERY_NODE_PATH: self._LPad(F('id'), padsize),
                 QUERY_DEPTH_FIELDNAME: Value(0, output_field=models.IntegerField()),
             })
-        return subnodes.union(roots)
-
-    def _breath_first(self, ):
-        pass
+        return subnodes, roots
 
     def _make_path_src_cte_fn(self, model, values, sequence_field, padsize):
         return model._base_tree_cte_builder(
@@ -130,17 +205,28 @@ class ProtoNodeQuerySet(CTEQuerySet):
                 'pid': F('parent_id'),
             },
             {
+                'querypath': Concat(
+                    self._LPad(F('parent_id'), padsize),
+                    Value(self.path_seperator),
+                    self._LPad(sequence_field, padsize)
+                ),
                 'path': Concat(
                     self._LPad(F('parent_id'), padsize),
-                    Value(","),
-                    self._LPad(sequence_field, padsize)
+                    Value(self.path_seperator),
+                    self._LPad(F('child_id'), padsize)
                 ),
                 'depth': Value(1, output_field=models.IntegerField())
             },
             (lambda cte: {
+                'querypath': Concat(
+                    cte.col.querypath,
+                    Value(self.path_seperator),
+                    self._LPad(sequence_field, padsize),
+                    output_field=models.TextField(),),
                 'path': Concat(
-                    cte.col.path, Value(","), self._LPad(
-                        sequence_field, padsize),
+                    cte.col.path,
+                    Value(self.path_seperator),
+                    self._LPad(F('child_id'), padsize),
                     output_field=models.TextField(),),
                 'depth': cte.col.depth + Value(1, output_field=models.IntegerField())
             }
@@ -211,10 +297,10 @@ class ProtoNode(BaseNode):
     def _base_tree_cte_builder(cls, local_name, link_name, result_spec,
                 recurse_init_spec, recurse_next_spec, initial_filter_spec):
 
-        # Since we have a recurse use for CTE, and  tree srutue all our cte's look
+        # Since we have a recurse use for CTE, and  tree structure all our CTE's look
         # similar  we walk from localname on across to link name, making a union
         # so the values in results table look similar (result_spec) it jus the
-        # initial quiery needs to seen some values (recurse_init) and recurse_next
+        # initial query needs to seen some values (recurse_init) and recurse_next
         # contains optional calcs.
 
         def cte_builder(cte):

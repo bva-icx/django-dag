@@ -159,7 +159,101 @@ class EdgeSortedDagRelationshipTests(TestCase):
         self.nodes.p2.add_child(self.nodes.p6, sequence=8)
         self.nodes.p2.add_child(self.nodes.p7, sequence=4)
 
-    def test_queryset_sortting_filter(self):
+    def test_queryset_sortting_filter_mixed(self):
+        for i in range(10, 16):
+            n = EdgeOrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        self.nodes.p6.insert_child_after(self.nodes.p10, None)
+        self.nodes.p6.insert_child_after(self.nodes.p11, self.nodes.p10)
+        self.nodes.p10.insert_child_after(self.nodes.p12, None)
+        self.nodes.p2.remove_child(self.nodes.p6)
+        self.nodes.p2.add_child(self.nodes.p3, sequence=9)
+        self.nodes.p3.add_child(self.nodes.p13, sequence=6)
+
+        with self.subTest(msg="with no cloned nodes"):
+            qs = EdgeOrderedNode.objects.all()
+            qs_sorted = qs.with_sort_sequence(
+                DagSortOrder.TOP_DOWN,
+                padsize=2,
+            )
+            qs_sorted = qs_sorted.with_sort_sequence(
+                DagSortOrder.DEPTH_FIRST,
+                padsize=2,
+            ).order_by('dag_top_down_path')
+
+            self.assertEqual(
+                tuple(
+                    qs_sorted.values_list(
+                        'pk',
+                        'dag_depth_first_path',
+                        'dag_top_down_path',
+                    )
+                ),
+                (
+                    (1, '01', '01'),
+                    (5, '01,12', '01,05'),
+                    (6, '01,08', '01,06'),
+                    (10, '01,08,50', '01,06,10'),
+                    (12, '01,08,50,50', '01,06,10,12'),
+                    (11, '01,08,75', '01,06,11'),
+                    (7, '01,04', '01,07'),
+                    (2, '02', '02'),
+                    (3, '02,09', '02,03'),
+                    (13, '02,09,06', '02,03,13'),
+                    (5, '02,01', '02,05'),
+                    (7, '02,04', '02,07'),
+                    (4, '04', '04'),
+                    (8, '08', '08'),
+                    (9, '09', '09'),
+                    (14, '14', '14'),
+                    (15, '15', '15')
+                )
+            )
+
+    def test_queryset_sortting_filter_topdown(self):
+        for i in range(10, 16):
+            n = EdgeOrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        self.nodes.p6.insert_child_after(self.nodes.p10, None)
+        self.nodes.p6.insert_child_after(self.nodes.p11, self.nodes.p10)
+        self.nodes.p10.insert_child_after(self.nodes.p12, None)
+        self.nodes.p2.remove_child(self.nodes.p6)
+        self.nodes.p2.add_child(self.nodes.p3, sequence=9)
+        self.nodes.p3.add_child(self.nodes.p13, sequence=6)
+
+        with self.subTest(msg="with no cloned nodes"):
+            qs = EdgeOrderedNode.objects.all()
+            qs_sorted = qs.with_sort_sequence(
+                DagSortOrder.TOP_DOWN,
+                padsize=2,
+            ).order_by('dag_top_down_path')
+
+            self.assertEqual(
+                tuple(qs_sorted.values_list('pk', 'dag_top_down_path')),
+                (
+                    (1, '01',),
+                    (5, '01,05'),
+                    (6, '01,06'),
+                    (10, '01,06,10'),
+                    (12, '01,06,10,12'),
+                    (11, '01,06,11'),
+                    (7, '01,07'),
+                    (2, '02'),
+                    (3, '02,03'),
+                    (13, '02,03,13'),
+                    (5, '02,05'),
+                    (7, '02,07'),
+                    (4, '04'),
+                    (8, '08'),
+                    (9, '09'),
+                    (14, '14'),
+                    (15, '15')
+                )
+            )
+
+    def test_queryset_sortting_filter_depthfirst(self):
         for i in range(10, 16):
             n = EdgeOrderedNode(name="%s" % i)
             n.save()

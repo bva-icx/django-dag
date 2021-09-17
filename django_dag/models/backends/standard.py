@@ -1,9 +1,10 @@
 import sys
 from collections import defaultdict
-
+from itertools import chain
 from django.db import models
 from django_dag.exceptions import NodeNotReachableException
 from django.db.models.query import QuerySet
+from django.db.models.query import EmptyQuerySet
 from django.db.models.expressions import (
     Case,
     F,
@@ -15,6 +16,9 @@ from django.db.models.functions import (
     Concat,
     LPad,
 )
+
+from django_delayed_union import DelayedUnionQuerySet
+from django_delayed_union.base import DelayedQuerySetMethod
 from .base import BaseNode
 
 
@@ -24,17 +28,49 @@ ProtoEdgeQuerySet = QuerySet
 
 
 _PATH_PADDING_SIZE = 4
+_PATH_PADDING_CHAR = '0'
+_PATH_SEPERATOR = ','
 _QUERY_ORDER_FIELDNAME = 'dag_order_sequence'
 
 QUERY_ORDER_FIELDNAME_FORMAT = 'dag_%(name)s_sequence'
 QUERY_PATH_FIELDNAME_FORMAT = 'dag_%(name)s_path'
+QUERY_NODE_PATH = 'dag_node_path'
 QUERY_DEPTH_FIELDNAME = 'dag_depth'
 
 
+class ReflowPrimeQueryMethod(DelayedQuerySetMethod):
+    """
+    """
+    def __call__(self, obj, *args, **kwargs):
+        # assert len(obj._querysets) == 2, "Can only work on DAG querysets"
+        prefetched = obj._result_cache
+        assert kwargs.pop('prefetched', None) is None, "cannot use due prefetch sources"
+
+        cloned_obj = obj._querysets[0]._clone()
+
+        return getattr(cloned_obj, self.name)(
+            *args, prefetched=prefetched, **kwargs)
+
+    def get_base_docstring(self):
+        return """
+        Returns a new delayed queryset with `{name}(...)`` having been called
+        on each of the component querysets.:
+        """
+
+
+class DagDelayedUnionQuerySet(DelayedUnionQuerySet):
+    """
+    A delayed union query where the first query is considered
+    the PRIME
+    """
+    with_sort_sequence = ReflowPrimeQueryMethod()
+
+
 def filter_order_with_annotations(queryset,
-        field_names=[], field_values=[], annotations=[],
+        field_names=[], values=[], annotations=[],
         empty_annotations=[],
-        sequence_name=_QUERY_ORDER_FIELDNAME, offset=0):
+        sequence_name=_QUERY_ORDER_FIELDNAME,
+        offset=0):
     """
     Filter a queryset to match a predefined order pattern.
 
@@ -60,26 +96,25 @@ def filter_order_with_annotations(queryset,
         If None then the items are not annotated with there sequence.
     :param offset int: The orders starting offset default: 0
     """
-
-    order_case = []
     annotations_lists = defaultdict(list)
     used = []
     query = queryset.none()
     filter_condition = defaultdict(list)
     pos = None
-    for pos, instance_value in enumerate(field_values):
+    for pos, instance_value in enumerate(values):
         when_condition = {}
-        for fn, fv in zip(field_names, instance_value):
+        for fn in field_names:
+            fv = getattr(instance_value, fn)
             when_condition.update({fn: fv, })
         if when_condition in used:
             # Start new query and union
             query = filter_order_with_annotations(
                 queryset,
                 field_names=field_names,
-                field_values=field_values[pos:],
+                values=values[pos:],
                 annotations=annotations[pos:],
                 offset=pos,
-                sequence_name=sequence_name
+                sequence_name=sequence_name,
             )
             break
         for fn, fv in when_condition.items():
@@ -94,32 +129,42 @@ def filter_order_with_annotations(queryset,
                 {'then': Cast(Value(pos + offset), output_field=models.IntegerField())})
             annotations_lists[sequence_name].append(When(**anno_when))
         used.append(when_condition.copy())
-        when_condition.update({'then': offset + pos})
-        order_case.append(When(**when_condition))
 
     if pos is None:
-        return query.annotate(**{name: Value(None, output_field=models.IntegerField()) for name in empty_annotations})
+        return query.annotate(
+            **{name: Value(None, output_field=models.IntegerField()) for name in empty_annotations}
+        )
 
     annotations_cases = {ak: Case(*av) for ak, av in annotations_lists.items()}
-    query = query.union(
-        queryset.filter(**filter_condition)
+    querypart = queryset.filter(**filter_condition) \
         .annotate(**annotations_cases)
+
+    if isinstance(query, EmptyQuerySet):
+        return querypart
+    return DagDelayedUnionQuerySet(
+        query, querypart
     )
-    return query
 
 
 class ProtoNodeQuerySet(QuerySet):
     padsize = _PATH_PADDING_SIZE
 
+    def __init__(self, *args, **kwargs):
+        self.path_seperator = _PATH_SEPERATOR
+        self.path_padding_character = _PATH_PADDING_CHAR
+        self.padding_size = _PATH_PADDING_SIZE
+        super().__init__(*args, **kwargs)
+
     def _LPad_sql(self, value, padsize):
         return LPad(
             Cast(value, output_field=models.TextField()),
-            padsize, Value('0'))
+            padsize, Value(self.path_padding_character))
 
     def _LPad_py(self, value, padsize):
-        return str(value).zfill(padsize)
+        return str(value).rjust(padsize, self.path_padding_character)
 
-    def with_top_down(self, *args, padsize=_PATH_PADDING_SIZE, **kwargs):
+    def with_top_down(self, *args,
+            padsize=_PATH_PADDING_SIZE, padchar=_PATH_PADDING_CHAR, **kwargs):
         """
         Generates a query that does a top-to-bottom traversal without regard to any
         possible (left-to-right) ordering of the nodes
@@ -127,10 +172,16 @@ class ProtoNodeQuerySet(QuerySet):
         :param padsize int: Length of the field segment for each node in pits path
             to it root.
         """
-        return self._sort_query(*args,
+        model, data, query_fn = self._sort_query(*args,
             padsize=padsize, sort_name='top_down', **kwargs)
 
-    def with_depth_first(self, *args, padsize=_PATH_PADDING_SIZE, **kwargs):
+        return model._convert_to_lazy_node_query(
+            data,
+            query_fn(data)
+        )
+
+    def with_depth_first(self, *args,
+            padsize=_PATH_PADDING_SIZE, padchar=_PATH_PADDING_CHAR, **kwargs):
         """
         Generates a query that does a depth-first traversal, this account for the nodes
         sequence ordering (left-to-right) of the nodes.
@@ -145,73 +196,169 @@ class ProtoNodeQuerySet(QuerySet):
                     self.model, 'child', 'parent',
                     parent_filter_ref=models.OuterRef('path_parent_ref')
                 )
-        return self._sort_query(*args,
-            padsize=padsize, sort_name='depth_first',
-            sequence_field=sequence_field, **kwargs)
 
-    def _sort_query(self, *args,
-            sort_name='sort',
+        model, data, query_fn = self._sort_query(
+                *args,
+                padsize=padsize,
+                sort_name='depth_first',
+                padchar=padchar,
+                sequence_field=sequence_field,
+                **kwargs)
+
+        return model._convert_to_lazy_node_query(
+            data,
+            query_fn(data)
+        )
+
+    def _sort_query(
+            self, *args,
+            padsize=_PATH_PADDING_SIZE,
+            padchar=_PATH_PADDING_CHAR,
+            sepchar=_PATH_SEPERATOR,
             sequence_field=None,
-            padsize=_PATH_PADDING_SIZE):
-
+            sort_name='sort',
+            prefetched=None,
+    ):
+        self.padchar = padchar
         _sequence_field = sequence_field if sequence_field else F('id')
         path_filedname = QUERY_PATH_FIELDNAME_FORMAT % {'name': sort_name, }
         node_model = self.model.get_node_model()
-        pks = list(map(lambda x: x.pk, self))
 
-        def child_values(roots):
+        def child_values(roots, nodedata, prefetch=False):
             for f in roots:
                 base_path = getattr(f, path_filedname)
+                base_ref_path = getattr(f, QUERY_NODE_PATH)
                 depth = getattr(f, QUERY_DEPTH_FIELDNAME) + 1
-                if f.pk in pks:
+
+                if base_ref_path in nodedata.keys():
                     yield f
-                yield from child_values(
-                    f.children.annotate(
+                elif self._LPad_py(f.pk, padsize) in nodedata.keys():
+                    yield f
+
+                if prefetch:
+                    children = []
+                    for child in f.children.annotate(
                         **{
                             'path_parent_ref': Value(
                                 int(f.pk), output_field=models.IntegerField()),
                             path_filedname: Concat(
-                                Value(base_path + ","),
+                                Value(base_path + sepchar),
                                 self._LPad_sql(_sequence_field, padsize),
+                            ),
+                            QUERY_NODE_PATH: Concat(
+                                Value(base_ref_path + sepchar),
+                                self._LPad_sql(F('id'), padsize),
                             ),
                             QUERY_DEPTH_FIELDNAME: Cast(
                                 Value(depth),
                                 output_field=models.IntegerField()
                             ),
                         }
-                    ))
+                    ):
+                        oldchild = nodedata.get(getattr(child, QUERY_NODE_PATH))
+                        setattr(oldchild, path_filedname, getattr(child, path_filedname))
+                        children.append(oldchild)
+                    yield from child_values(
+                        children, nodedata,
+                        prefetch=prefetch,
+                    )
+                else:
+                    yield from child_values(
+                        f.children.annotate(
+                            **{
+                                'path_parent_ref': Value(
+                                    int(f.pk), output_field=models.IntegerField()),
+                                path_filedname: Concat(
+                                    Value(base_path + sepchar),
+                                    self._LPad_sql(_sequence_field, padsize),
+                                ),
+                                QUERY_NODE_PATH: Concat(
+                                    Value(base_ref_path + sepchar),
+                                    self._LPad_sql(F('id'), padsize),
+                                ),
+                                QUERY_DEPTH_FIELDNAME: Cast(
+                                    Value(depth),
+                                    output_field=models.IntegerField()
+                                ),
+                            }
+                        ), nodedata, prefetch=prefetch)
 
-        roots = node_model.objects.roots() \
-            .annotate(**{
+        if prefetched:
+            # IF we are useing prefetched data we need to use the 'node-path' to fetch by
+            query_nodedata = dict(map(
+                lambda x: (getattr(x, QUERY_NODE_PATH), x),
+                prefetched))
+            search_roots = []
+            for node in prefetched:
+                if getattr(node, QUERY_DEPTH_FIELDNAME) == 0:
+                    setattr(node, path_filedname, self._LPad_py(node.id, padsize))
+                    search_roots.append(node)
+            annotations_fields = [
+                key
+                for key in self.query.annotations.keys()
+                if key not in [
+                    QUERY_DEPTH_FIELDNAME,
+                    QUERY_NODE_PATH
+                ] and key.startswith('dag_')
+            ]
+        else:
+            query_nodedata = dict(map(
+                lambda x: (self._LPad_py(x.pk, padsize), x),
+                self))
+            search_roots = node_model.objects.roots().annotate(**{
                 path_filedname: self._LPad_sql(F('id'), padsize),
+                QUERY_NODE_PATH: self._LPad_sql(F('id'), padsize),
                 QUERY_DEPTH_FIELDNAME: Cast(
                     Value(0),
                     output_field=models.IntegerField()
                 )
             })
-        data = list(child_values(roots))
-        return node_model._convert_to_lazy_node_query(
-            data,
-            filter_order_with_annotations(
+            annotations_fields = []
+
+        annotations_fields.append(path_filedname)
+        data = list(child_values(search_roots, query_nodedata, prefetch=bool(prefetched)))
+
+        def query_fn(querydata):
+            return filter_order_with_annotations(
                 node_model.objects,
                 field_names=['id'],
-                field_values=[(d.pk,) for d in data],
+                values=querydata,
                 annotations=[
-                    {
-                        path_filedname: Cast(
-                            Value(getattr(d, path_filedname)),
-                            output_field=models.TextField()
-                        ),
-                        QUERY_DEPTH_FIELDNAME: Cast(
-                            Value(getattr(d, QUERY_DEPTH_FIELDNAME)),
-                            output_field=models.IntegerField()
-                        ),
-                    }
-                    for d in data
+                    dict(
+                        chain(
+                            [
+                                (
+                                    QUERY_DEPTH_FIELDNAME, Cast(
+                                        Value(getattr(d, QUERY_DEPTH_FIELDNAME)),
+                                        output_field=models.IntegerField())
+                                ),
+                                (
+                                    QUERY_NODE_PATH, Cast(
+                                        Value(getattr(d, QUERY_NODE_PATH)),
+                                        output_field=models.TextField())
+                                ),
+                            ],
+                            [
+                                (
+                                    filedname, Cast(
+                                        Value(getattr(d, filedname)),
+                                        output_field=models.TextField()
+                                    ),
+                                )
+                                for filedname in annotations_fields
+                            ]
+                        )
+                    )
+                    for d in querydata
                 ],
-                empty_annotations=[path_filedname, QUERY_DEPTH_FIELDNAME],
-                sequence_name=None
+                empty_annotations=list(chain([QUERY_DEPTH_FIELDNAME], annotations_fields)),
+                sequence_name=None,
             )
+
+        return ( #query.model._convert_to_lazy_node_query(
+            node_model,
+            data,
+            query_fn
         )
 
 

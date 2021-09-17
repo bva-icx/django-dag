@@ -1,10 +1,10 @@
-from ..models import backend
 from enum import IntEnum, auto
+
+from ..models import backend
 
 
 class DagSortOrder(IntEnum):
     TOP_DOWN = auto()
-    BREADTH_FIRST = auto()
     DEPTH_FIRST = auto()
 
 
@@ -49,17 +49,12 @@ class BaseNodeQuerySet(backend.ProtoNodeQuerySet):
         :param method `DagSortOrder`: The sort method to use.
         :return: QuerySet
         """
-        def get_or_raise(methodname):
-            if not hasattr(self, methodname):
-                raise ValueError('Unknown sort method')
-            return getattr(self, methodname)(self, *args, **kwargs)
 
         if method == DagSortOrder.TOP_DOWN:
             return self.with_top_down(*args, **kwargs)
-        elif method == DagSortOrder.BREADTH_FIRST:
-            return self.with_breath_first(*args, **kwargs)
         elif method == DagSortOrder.DEPTH_FIRST:
             return self.with_depth_first(*args, **kwargs)
+
         raise ValueError('Unknown sort method')
 
 
