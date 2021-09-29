@@ -11,10 +11,9 @@ from django.db.models.expressions import (
     F,
     Value,
 )
-from django.db.models.functions.window import RowNumber
 from django.db.models.query import EmptyQuerySet
 from django.db.models import Exists, OuterRef, Subquery
-from django.db.models import Max, Window
+from django.db.models import Max
 from django_dag.exceptions import NodeNotReachableException
 from django_cte import CTEQuerySet, With
 from django_delayed_union import DelayedUnionQuerySet

@@ -355,7 +355,7 @@ class ProtoNodeQuerySet(QuerySet):
                 sequence_name=None,
             )
 
-        return ( #query.model._convert_to_lazy_node_query(
+        return (
             node_model,
             data,
             query_fn
