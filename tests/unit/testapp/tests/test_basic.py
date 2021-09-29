@@ -663,15 +663,15 @@ class NodeCoreSortRelationshipTests(TestCase):
 
     def test_with_sort_query_return_nodes(self,):
         qs = BasicNode.objects
-        with self.subTest(msg="DagSortOrder TOP_DOWN"):
+        with self.subTest(msg="DagSortOrder BREATH_FIRST"):
             qs_withsort = qs.with_sort_sequence(
-                DagSortOrder.TOP_DOWN,
+                DagSortOrder.NODE_PK,
             )
             map(lambda obj: self.assertIsInstance(
                 obj, BasicNode), list(qs_withsort))
-        with self.subTest(msg="DagSortOrder DEPTH_FIRST"):
+        with self.subTest(msg="DagSortOrder DEPTH_FIRST_PREORDER"):
             qs_withsort = qs.with_sort_sequence(
-                DagSortOrder.DEPTH_FIRST,
+                DagSortOrder.NODE_SEQUENCE,
             )
             map(lambda obj: self.assertIsInstance(
                 obj, BasicNode), list(qs_withsort))
@@ -682,10 +682,10 @@ class NodeCoreSortRelationshipTests(TestCase):
 
         qs = BasicNode.objects.filter(pk__in=[3, 4, 5, 7, 8, 9])
         qs_withsort = qs.with_sort_sequence(
-            DagSortOrder.TOP_DOWN,
+            DagSortOrder.NODE_PK,
         )
-        qs_sorted = qs_withsort.order_by('dag_top_down_path') \
-            .values_list('pk', 'dag_top_down_path')
+        qs_sorted = qs_withsort.order_by('dag_pk_path') \
+            .values_list('pk', 'dag_pk_path')
         self.assertEqual(
             list(qs_sorted), [
                 (3, '0001,0003'),
@@ -701,9 +701,9 @@ class NodeCoreSortRelationshipTests(TestCase):
     def test_cope_with_sort_on_known_empty_query(self,):
         qs = BasicNode.objects.none()
         qs_withsort = qs.with_sort_sequence(
-            DagSortOrder.TOP_DOWN,
+            DagSortOrder.NODE_PK,
         )
-        qs_sorted = qs_withsort.order_by('dag_top_down_path')
+        qs_sorted = qs_withsort.order_by('dag_pk_path')
         self.assertEqual(
             list(qs_sorted), []
         )
@@ -712,9 +712,9 @@ class NodeCoreSortRelationshipTests(TestCase):
         max_pk = BasicNode.objects.all().aggregate(Max('pk'))
         qs = BasicNode.objects.filter(pk__gt=max_pk['pk__max'])
         qs_withsort = qs.with_sort_sequence(
-            DagSortOrder.TOP_DOWN,
+            DagSortOrder.NODE_PK,
         )
-        qs_sorted = qs_withsort.order_by('dag_top_down_path')
+        qs_sorted = qs_withsort.order_by('dag_pk_path')
         self.assertEqual(
             list(qs_sorted), []
         )
@@ -732,11 +732,11 @@ class NodeCoreSortRelationshipTests(TestCase):
         with self.subTest(msg="with no cloned nodes (path)"):
             qs = BasicNode.objects.all()
             qs_sorted = qs.with_sort_sequence(
-                DagSortOrder.TOP_DOWN,
+                DagSortOrder.NODE_PK,
                 padsize=2
-            ).order_by('dag_top_down_path')
+            ).order_by('dag_pk_path')
             self.assertEqual(
-                tuple(qs_sorted.values_list('pk', 'dag_top_down_path')),
+                tuple(qs_sorted.values_list('pk', 'dag_pk_path')),
                 (
                     (1, '01'),
                     (3, '01,03'),
@@ -760,11 +760,11 @@ class NodeCoreSortRelationshipTests(TestCase):
             self.nodes.p6.add_child(self.nodes.p10)
             qs = BasicNode.objects.all()
             qs_sorted = qs.with_sort_sequence(
-                DagSortOrder.TOP_DOWN,
+                DagSortOrder.NODE_PK,
                 padsize=2
-            ).order_by('dag_top_down_path')
+            ).order_by('dag_pk_path')
             self.assertEqual(
-                tuple(qs_sorted.values_list('pk', 'dag_top_down_path')),
+                tuple(qs_sorted.values_list('pk', 'dag_pk_path')),
                 (
                     (1, '01'),
                     (3, '01,03'),

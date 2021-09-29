@@ -174,20 +174,20 @@ class EdgeSortedDagRelationshipTests(TestCase):
         with self.subTest(msg="with no cloned nodes"):
             qs = EdgeOrderedNode.objects.all()
             qs_sorted = qs.with_sort_sequence(
-                DagSortOrder.TOP_DOWN,
+                DagSortOrder.NODE_PK,
                 padsize=2,
             )
             qs_sorted = qs_sorted.with_sort_sequence(
-                DagSortOrder.DEPTH_FIRST,
+                DagSortOrder.NODE_SEQUENCE,
                 padsize=2,
-            ).order_by('dag_top_down_path')
+            ).order_by('dag_pk_path')
 
             self.assertEqual(
                 tuple(
                     qs_sorted.values_list(
                         'pk',
-                        'dag_depth_first_path',
-                        'dag_top_down_path',
+                        'dag_sequence_path',
+                        'dag_pk_path',
                     )
                 ),
                 (
@@ -211,7 +211,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
                 )
             )
 
-    def test_queryset_sortting_filter_topdown(self):
+    def test_queryset_sortting_filter_pk_path(self):
         for i in range(10, 16):
             n = EdgeOrderedNode(name="%s" % i)
             n.save()
@@ -226,12 +226,12 @@ class EdgeSortedDagRelationshipTests(TestCase):
         with self.subTest(msg="with no cloned nodes"):
             qs = EdgeOrderedNode.objects.all()
             qs_sorted = qs.with_sort_sequence(
-                DagSortOrder.TOP_DOWN,
+                DagSortOrder.NODE_PK,
                 padsize=2,
-            ).order_by('dag_top_down_path')
+            ).order_by('dag_pk_path')
 
             self.assertEqual(
-                tuple(qs_sorted.values_list('pk', 'dag_top_down_path')),
+                tuple(qs_sorted.values_list('pk', 'dag_pk_path')),
                 (
                     (1, '01',),
                     (5, '01,05'),
@@ -253,7 +253,7 @@ class EdgeSortedDagRelationshipTests(TestCase):
                 )
             )
 
-    def test_queryset_sortting_filter_depthfirst(self):
+    def test_queryset_sortting_filter_default(self):
         for i in range(10, 16):
             n = EdgeOrderedNode(name="%s" % i)
             n.save()
@@ -268,11 +268,51 @@ class EdgeSortedDagRelationshipTests(TestCase):
         with self.subTest(msg="with no cloned nodes"):
             qs = EdgeOrderedNode.objects.all()
             qs_sorted = qs.with_sort_sequence(
-                DagSortOrder.DEPTH_FIRST,
                 padsize=2,
-            ).order_by('dag_depth_first_path')
+            ).order_by('dag_sequence_path')
             self.assertEqual(
-                tuple(qs_sorted.values_list('pk', 'dag_depth_first_path')),
+                tuple(qs_sorted.values_list('pk', 'dag_sequence_path')),
+                (
+                    (1, '01'),
+                    (7, '01,04'),
+                    (6, '01,08'),
+                    (10, '01,08,50'),
+                    (12, '01,08,50,50'),
+                    (11, '01,08,75'),
+                    (5, '01,12'),
+                    (2, '02'),
+                    (5, '02,01'),
+                    (7, '02,04'),
+                    (3, '02,09'),
+                    (13, '02,09,06'),
+                    (4, '04'),
+                    (8, '08'),
+                    (9, '09'),
+                    (14, '14'),
+                    (15, '15')
+                )
+            )
+
+    def test_queryset_sortting_filter_depthfirst_preorder(self):
+        for i in range(10, 16):
+            n = EdgeOrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        self.nodes.p6.insert_child_after(self.nodes.p10, None)
+        self.nodes.p6.insert_child_after(self.nodes.p11, self.nodes.p10)
+        self.nodes.p10.insert_child_after(self.nodes.p12, None)
+        self.nodes.p2.remove_child(self.nodes.p6)
+        self.nodes.p2.add_child(self.nodes.p3, sequence=9)
+        self.nodes.p3.add_child(self.nodes.p13, sequence=6)
+
+        with self.subTest(msg="with no cloned nodes"):
+            qs = EdgeOrderedNode.objects.all()
+            qs_sorted = qs.with_sort_sequence(
+                DagSortOrder.NODE_SEQUENCE,
+                padsize=2,
+            ).order_by('dag_sequence_path')
+            self.assertEqual(
+                tuple(qs_sorted.values_list('pk', 'dag_sequence_path')),
                 (
                     (1, '01'),
                     (7, '01,04'),
@@ -297,11 +337,11 @@ class EdgeSortedDagRelationshipTests(TestCase):
             self.nodes.p2.insert_child_after(self.nodes.p6, self.nodes.p5)
             qs = EdgeOrderedNode.objects.all()
             qs_sorted = qs.with_sort_sequence(
-                DagSortOrder.DEPTH_FIRST,
+                DagSortOrder.NODE_SEQUENCE,
                 padsize=2,
-            ).order_by('dag_depth_first_path')
+            ).order_by('dag_sequence_path')
             self.assertEqual(
-                tuple(qs_sorted.values_list('pk', 'dag_depth_first_path')),
+                tuple(qs_sorted.values_list('pk', 'dag_sequence_path')),
                 (
                     (1, '01'),
                     (7, '01,04'),
@@ -316,7 +356,6 @@ class EdgeSortedDagRelationshipTests(TestCase):
                     (10, '02,02,50'),
                     (12, '02,02,50,50'),
                     (11, '02,02,75'),
-
                     (7, '02,04'),
                     (3, '02,09'),
                     (13, '02,09,06'),
@@ -327,6 +366,52 @@ class EdgeSortedDagRelationshipTests(TestCase):
                     (15, '15')
                 )
             )
+
+    @unittest.expectedFailure
+    def test_queryset_sortting_filter_depthfirst_postorder(self):
+        for i in range(10, 16):
+            n = EdgeOrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        self.nodes.p6.insert_child_after(self.nodes.p10, None)
+        self.nodes.p6.insert_child_after(self.nodes.p11, self.nodes.p10)
+        self.nodes.p10.insert_child_after(self.nodes.p12, None)
+        self.nodes.p2.remove_child(self.nodes.p6)
+        self.nodes.p2.add_child(self.nodes.p3, sequence=9)
+        self.nodes.p3.add_child(self.nodes.p13, sequence=6)
+
+        with self.subTest(msg="with no cloned nodes"):
+            qs = EdgeOrderedNode.objects.all()
+            qs_sorted = qs.with_sort_sequence(
+                DagSortOrder.NODE_SEQUENCE,
+                padsize=2,
+            ).order_by('dag_sequence_path')
+            self.assertEqual(
+                tuple(qs_sorted.values_list('pk', 'dag_sequence_path')),
+                (
+                    (7, '01,04'),
+                    (12, '01,08,50,50'),
+                    (10, '01,08,50'),
+                    (6, '01,08'),
+                    (11, '01,08,75'),
+                    (5, '01,12'),
+                    (1, '01'),
+                    (5, '02,01'),
+                    (7, '02,04'),
+                    (13, '02,09,06'),
+                    (3, '02,09'),
+                    (2, '02'),
+                    (4, '04'),
+                    (8, '08'),
+                    (9, '09'),
+                    (14, '14'),
+                    (15, '15')
+                )
+            )
+
+    @unittest.expectedFailure
+    def test_queryset_sortting_filter_depthfirst_inorder(self):
+        pass
 
     def test_children_ordered_filter(self):
         self.assertEqual(
@@ -749,11 +834,11 @@ class NodeSortedDagRelationshipTests(TestCase):
         with self.subTest(msg="with no cloned nodes"):
             qs = OrderedNode.objects.all()
             qs_sorted = qs.with_sort_sequence(
-                DagSortOrder.DEPTH_FIRST,
+                DagSortOrder.NODE_SEQUENCE,
                 padsize=2,
-            ).order_by('dag_depth_first_path')
+            ).order_by('dag_sequence_path')
             self.assertEqual(
-                tuple(qs_sorted.values_list('pk', 'dag_depth_first_path')),
+                tuple(qs_sorted.values_list('pk', 'dag_sequence_path')),
                 (
                     (1, '01'),
                     (5, '01,02'),
@@ -776,11 +861,11 @@ class NodeSortedDagRelationshipTests(TestCase):
             self.nodes.p6.insert_child_after(self.nodes.p10, None)
             qs = OrderedNode.objects.all()
             qs_sorted = qs.with_sort_sequence(
-                DagSortOrder.DEPTH_FIRST,
+                DagSortOrder.NODE_SEQUENCE,
                 padsize=2,
-            ).order_by('dag_depth_first_path')
+            ).order_by('dag_sequence_path')
             self.assertEqual(
-                tuple(qs_sorted.values_list('pk', 'dag_depth_first_path')),
+                tuple(qs_sorted.values_list('pk', 'dag_sequence_path')),
                 (
                     (1, '01'),
                     (5, '01,02'),

@@ -83,7 +83,7 @@ class ProtoNodeQuerySet(CTEQuerySet):
             Cast(value, output_field=models.TextField()),
             padsize, Value(self.path_padding_character))
 
-    def with_top_down(self, *args,
+    def with_pk_path(self, *args,
             padsize=_PATH_PADDING_SIZE, padchar=_PATH_PADDING_CHAR, **kwargs):
         """
         Generates a query that does a top-to-bottom traversal without regard to any
@@ -97,17 +97,17 @@ class ProtoNodeQuerySet(CTEQuerySet):
                     *args,
                     padsize=padsize,
                     padchar=padchar,
-                    sort_name='top_down',
+                    sort_name='pk',
                     **kwargs))
 
-    def with_depth_first(self, *args,
+    def with_sequence_path(self, *args,
             padsize=_PATH_PADDING_SIZE, padchar=_PATH_PADDING_CHAR, **kwargs):
         """
         Generates a query that add annotations for depth-first traversal to the nodes
 
         This account for the nodes sequence ordering (left-to-right) of the nodes and
         allows the nodes to be sorted.
-        nodes.orderby('dag_depth_first') produces as 'preorder (Root, Left, Right)' sort
+        nodes.orderby('dag_sequence_path') produces as 'preorder (Root, Left, Right)' sort
 
         Nodes with multiple roots will be present in the results multiple time
 
@@ -124,7 +124,7 @@ class ProtoNodeQuerySet(CTEQuerySet):
             *self._sort_query(
                 *args,
                 padsize=padsize,
-                sort_name='depth_first',
+                sort_name='sequence',
                 padchar=padchar,
                 sequence_field=sequence_field,
                 **kwargs))

@@ -163,7 +163,7 @@ class ProtoNodeQuerySet(QuerySet):
     def _LPad_py(self, value, padsize):
         return str(value).rjust(padsize, self.path_padding_character)
 
-    def with_top_down(self, *args,
+    def with_pk_path(self, *args,
             padsize=_PATH_PADDING_SIZE, padchar=_PATH_PADDING_CHAR, **kwargs):
         """
         Generates a query that does a top-to-bottom traversal without regard to any
@@ -173,14 +173,14 @@ class ProtoNodeQuerySet(QuerySet):
             to it root.
         """
         model, data, query_fn = self._sort_query(*args,
-            padsize=padsize, sort_name='top_down', **kwargs)
+            padsize=padsize, sort_name='pk', **kwargs)
 
         return model._convert_to_lazy_node_query(
             data,
             query_fn(data)
         )
 
-    def with_depth_first(self, *args,
+    def with_sequence_path(self, *args,
             padsize=_PATH_PADDING_SIZE, padchar=_PATH_PADDING_CHAR, **kwargs):
         """
         Generates a query that does a depth-first traversal, this account for the nodes
@@ -200,7 +200,7 @@ class ProtoNodeQuerySet(QuerySet):
         model, data, query_fn = self._sort_query(
                 *args,
                 padsize=padsize,
-                sort_name='depth_first',
+                sort_name='sequence',
                 padchar=padchar,
                 sequence_field=sequence_field,
                 **kwargs)
