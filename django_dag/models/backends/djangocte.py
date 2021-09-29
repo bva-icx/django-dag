@@ -1,26 +1,32 @@
 from abc import ABC, abstractmethod
 from typing import List
-from django.db import models
+from django.db import models, NotSupportedError
 from django.db.models.functions import (
     Cast,
     Concat,
     LPad,
     StrIndex,
     Substr,
+    RowNumber
 )
 from django.db.models.expressions import (
     ExpressionWrapper,
     F,
-    Value,
+    Value
 )
-from django.db.models.query import EmptyQuerySet
-from django.db.models import Exists, OuterRef, Subquery
-from django.db.models import Max
+from django.db.models.query import EmptyQuerySet, QuerySet
+from django.db.models import (
+    Exists,
+    Max,
+    OuterRef,
+    Subquery,
+    Window
+)
 from django_dag.exceptions import NodeNotReachableException
 from django_cte import CTEQuerySet, With, CTEManager
-from django_delayed_union import DelayedUnionQuerySet
 from django_delayed_union.base import DelayedQuerySetMethod
 from .base import BaseNode
+from .query import DagBaseDelayedUnionQuerySet
 
 
 ProtoNodeManager = CTEManager
@@ -58,8 +64,9 @@ class SplitPassthroughMethod(DelayedQuerySetMethod):
         """
 
 
-class DagDelayedUnionQuerySet(DelayedUnionQuerySet):
+class DagDelayedUnionQuerySet(DagBaseDelayedUnionQuerySet):
     with_sort_sequence = SplitPassthroughMethod()
+    distinct_node = SplitPassthroughMethod()
 
 
 class DagCteAnnotation(ABC):
@@ -175,6 +182,45 @@ class ProtoNodeQuerySet(CTEQuerySet):
         return LPad(
             Cast(value, output_field=models.TextField()),
             padsize, Value(self.path_padding_character))
+
+    def distinct_node(self, order_field: str, roots: QuerySet = None, **kwargs):
+        """
+        Modifies the query so that with nodes as distinct.
+
+        As withing the DAG node can occur a number of times, this add support for a
+        topological like view of the dag, where only the first visit to a node is included.
+        This must be called after the initial query to add the order clause is run
+
+        :param order_field (str): The name of the field or annotation the is used to
+            order the 'distinct' nodes to determin the first
+        """
+        if roots is None:
+            raise NotSupportedError(
+                'Cannot apply node distinction until a node sequence is applied')
+
+        # This is used to filter the nodes so we only select the first visit
+        # to a node. It is only needed to be done on the non root nodes
+        # as root node will always be visited only once.
+        # As SQL cannot filter on a window function we use a subquery via
+        # a with statement to preform this
+        nodes_cte = With(
+            self.annotate(
+                _visit_count=Window(
+                    expression=RowNumber(),
+                    partition_by=[F('id'), ],
+                    order_by=F(order_field).asc(),
+                )
+            ),
+            name=f'distinct_node_{order_field}'
+        )
+        results = nodes_cte \
+            .queryset() \
+            .with_cte(nodes_cte) \
+            .filter(
+                _visit_count=1
+            )
+        roots = roots.annotate(_visit_count=Value(1, output_field=models.IntegerField()))
+        return DagDelayedUnionQuerySet(results, roots)
 
     def with_pk_path(self, *args,
             padsize=_PATH_PADDING_SIZE, padchar=_PATH_PADDING_CHAR, **kwargs):

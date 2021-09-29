@@ -2,6 +2,7 @@ from django_dag.models.order_control import Position
 import unittest
 from django.conf import settings
 from django.test import TestCase
+from django.db import NotSupportedError
 from django.db.models import TextField
 from django.db.models.expressions import F, Value
 from django.db.models.functions import Cast, Concat, RPad
@@ -213,6 +214,89 @@ class EdgeSortedDagRelationshipTests(TestCase):
                     (15, '15', '15')
                 )
             )
+
+    def test_queryset_sortting_filter_node_distinct(self):
+        for i in range(10, 16):
+            n = EdgeOrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        self.nodes.p6.insert_child_after(self.nodes.p10, None)
+        self.nodes.p6.insert_child_after(self.nodes.p11, self.nodes.p10)
+        self.nodes.p10.insert_child_after(self.nodes.p12, None)
+        self.nodes.p2.remove_child(self.nodes.p6)
+        self.nodes.p2.add_child(self.nodes.p3, sequence=9)
+        self.nodes.p3.add_child(self.nodes.p13, sequence=6)
+        expected_nodes = (
+            (1, '01',),
+            (5, '01,05'),
+            (6, '01,06'),
+            (10, '01,06,10'),
+            (12, '01,06,10,12'),
+            (11, '01,06,11'),
+            (7, '01,07'),
+            (2, '02'),
+            (3, '02,03'),
+            (13, '02,03,13'),
+            (4, '04'),
+            (8, '08'),
+            (9, '09'),
+            (14, '14'),
+            (15, '15')
+        )
+        qs = EdgeOrderedNode.objects.all()
+        with self.subTest(msg="query sort order same as visit sort"):
+            qs_sorted = qs.with_sort_sequence(
+                padsize=2,
+            ).distinct_node(
+                'dag_node_path'
+            ).order_by('dag_node_path')
+            self.assertEqual(
+                tuple(qs_sorted.values_list('pk', 'dag_node_path')),
+                expected_nodes
+            )
+        with self.subTest(msg="query sort order reverse to filter order"):
+            qs_sorted = qs.with_sort_sequence(
+                padsize=2,
+            ).distinct_node(
+                'dag_node_path'
+            ).order_by('-dag_node_path')
+            self.assertEqual(
+                tuple(qs_sorted.values_list('pk', 'dag_node_path')),
+                tuple(reversed(expected_nodes))
+            )
+
+    def test_queryset_sortting_filter_node_distinct_returns_nodes(self):
+        for i in range(10, 16):
+            n = EdgeOrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        self.nodes.p6.insert_child_after(self.nodes.p10, None)
+        self.nodes.p6.insert_child_after(self.nodes.p11, self.nodes.p10)
+        self.nodes.p10.insert_child_after(self.nodes.p12, None)
+        self.nodes.p2.remove_child(self.nodes.p6)
+        self.nodes.p2.add_child(self.nodes.p3, sequence=9)
+        self.nodes.p3.add_child(self.nodes.p13, sequence=6)
+        qs = EdgeOrderedNode.objects.all()
+        qs_sorted = qs.with_sort_sequence(
+            padsize=2,
+        ).distinct_node('dag_node_path')
+        for node in qs_sorted:
+            self.assertIsInstance(node, EdgeOrderedNode)
+
+    def test_queryset_sortting_filter_node_distinct_without_sort(self):
+        for i in range(10, 16):
+            n = EdgeOrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        self.nodes.p6.insert_child_after(self.nodes.p10, None)
+        self.nodes.p6.insert_child_after(self.nodes.p11, self.nodes.p10)
+        self.nodes.p10.insert_child_after(self.nodes.p12, None)
+        self.nodes.p2.remove_child(self.nodes.p6)
+        self.nodes.p2.add_child(self.nodes.p3, sequence=9)
+        self.nodes.p3.add_child(self.nodes.p13, sequence=6)
+        qs = EdgeOrderedNode.objects.all()
+        with self.assertRaises(NotSupportedError):
+            list(qs.distinct_node('dag_node_path'))
 
     def test_queryset_sortting_filter_breathfirst(self):
         for i in range(10, 16):

@@ -1,10 +1,10 @@
 import sys
 from collections import defaultdict
 from itertools import chain
-from django.db import models
+from functools import partial
+from django.db import models, NotSupportedError
 from django_dag.exceptions import NodeNotReachableException
-from django.db.models.query import QuerySet
-from django.db.models.query import EmptyQuerySet
+from django.db.models.query import EmptyQuerySet, QuerySet
 from django.db.models.expressions import (
     Case,
     F,
@@ -16,10 +16,9 @@ from django.db.models.functions import (
     Concat,
     LPad,
 )
-
-from django_delayed_union import DelayedUnionQuerySet
 from django_delayed_union.base import DelayedQuerySetMethod
 from .base import BaseNode
+from .query import DagBaseDelayedUnionQuerySet
 
 
 ProtoNodeManager = models.Manager
@@ -47,7 +46,6 @@ class ReflowPrimeQueryMethod(DelayedQuerySetMethod):
         assert kwargs.pop('prefetched', None) is None, "cannot use due prefetch sources"
 
         cloned_obj = obj._querysets[0]._clone()
-
         return getattr(cloned_obj, self.name)(
             *args, prefetched=prefetched, **kwargs)
 
@@ -58,12 +56,13 @@ class ReflowPrimeQueryMethod(DelayedQuerySetMethod):
         """
 
 
-class DagDelayedUnionQuerySet(DelayedUnionQuerySet):
+class DagDelayedUnionQuerySet(DagBaseDelayedUnionQuerySet):
     """
     A delayed union query where the first query is considered
     the PRIME
     """
     with_sort_sequence = ReflowPrimeQueryMethod()
+    distinct_node = ReflowPrimeQueryMethod()
 
 
 def filter_order_with_annotations(queryset,
@@ -163,6 +162,46 @@ class ProtoNodeQuerySet(QuerySet):
     def _LPad_py(self, value, padsize):
         return str(value).rjust(padsize, self.path_padding_character)
 
+    def distinct_node(self, order_field: str, roots: QuerySet = None, **kwargs):
+        """
+        Modifies the query so that with nodes as distinct.
+
+        As withing the DAG node can occur a number of times, this add support for a
+        topological like view of the dag, where only the first visit to a node is included.
+        This must be called after the initial query to add the order clause is run
+
+        :param order_field (str): The name of the field or annotation the is used to
+            order the 'distinct' nodes to determin the first
+        """
+        prefetched = kwargs.get('prefetched', None)
+        if prefetched is None:
+            raise NotSupportedError(
+                'Cannot apply node distinction until a node sequence is applied')
+
+        # Filter data for first pk match
+        def data_filter(in_data):
+            found = set()
+            for item in in_data:
+                if item.pk not in found:
+                    found.add(item.pk)
+                    yield item
+
+        annotations_fields = [
+            key
+            for key in self.query.annotations.keys()
+            if key not in [
+                QUERY_DEPTH_FIELDNAME,
+                QUERY_NODE_PATH
+            ] and key.startswith('dag_')
+        ]
+
+        out_data = list(data_filter(prefetched))
+        model = self.model.get_node_model()
+        return model._convert_to_lazy_node_query(
+            out_data,
+            self._build_query_fn(out_data, model=model, annotations_fields=annotations_fields)
+        )
+
     def with_pk_path(self, *args,
             padsize=_PATH_PADDING_SIZE, padchar=_PATH_PADDING_CHAR, **kwargs):
         """
@@ -208,6 +247,46 @@ class ProtoNodeQuerySet(QuerySet):
         return model._convert_to_lazy_node_query(
             data,
             query_fn(data)
+        )
+
+    @staticmethod
+    def _build_query_fn(querydata, *args, **kwargs):
+        model = kwargs.get('model')
+        annotations_fields = kwargs.get('annotations_fields')
+        return filter_order_with_annotations(
+            model.objects,
+            field_names=['id'],
+            values=querydata,
+            annotations=[
+                dict(
+                    chain(
+                        [
+                            (
+                                QUERY_DEPTH_FIELDNAME, Cast(
+                                    Value(getattr(d, QUERY_DEPTH_FIELDNAME)),
+                                    output_field=models.IntegerField())
+                            ),
+                            (
+                                QUERY_NODE_PATH, Cast(
+                                    Value(getattr(d, QUERY_NODE_PATH)),
+                                    output_field=models.TextField())
+                            ),
+                        ],
+                        [
+                            (
+                                filedname, Cast(
+                                    Value(getattr(d, filedname)),
+                                    output_field=models.TextField()
+                                ),
+                            )
+                            for filedname in annotations_fields
+                        ]
+                    )
+                )
+                for d in querydata
+            ],
+            empty_annotations=list(chain([QUERY_DEPTH_FIELDNAME], annotations_fields)),
+            sequence_name=None,
         )
 
     def _sort_query(
@@ -318,47 +397,10 @@ class ProtoNodeQuerySet(QuerySet):
         annotations_fields.append(path_filedname)
         data = list(child_values(search_roots, query_nodedata, prefetch=bool(prefetched)))
 
-        def query_fn(querydata):
-            return filter_order_with_annotations(
-                node_model.objects,
-                field_names=['id'],
-                values=querydata,
-                annotations=[
-                    dict(
-                        chain(
-                            [
-                                (
-                                    QUERY_DEPTH_FIELDNAME, Cast(
-                                        Value(getattr(d, QUERY_DEPTH_FIELDNAME)),
-                                        output_field=models.IntegerField())
-                                ),
-                                (
-                                    QUERY_NODE_PATH, Cast(
-                                        Value(getattr(d, QUERY_NODE_PATH)),
-                                        output_field=models.TextField())
-                                ),
-                            ],
-                            [
-                                (
-                                    filedname, Cast(
-                                        Value(getattr(d, filedname)),
-                                        output_field=models.TextField()
-                                    ),
-                                )
-                                for filedname in annotations_fields
-                            ]
-                        )
-                    )
-                    for d in querydata
-                ],
-                empty_annotations=list(chain([QUERY_DEPTH_FIELDNAME], annotations_fields)),
-                sequence_name=None,
-            )
-
         return (
             node_model,
             data,
-            query_fn
+            partial(self._build_query_fn, model=node_model, annotations_fields=annotations_fields)
         )
 
 
