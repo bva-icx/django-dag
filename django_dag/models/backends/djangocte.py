@@ -15,20 +15,10 @@ from django.db.models.query import EmptyQuerySet
 from django.db.models import Exists, OuterRef, Subquery
 from django.db.models import Max
 from django_dag.exceptions import NodeNotReachableException
-from django_cte import CTEQuerySet, With
+from django_cte import CTEQuerySet, With, CTEManager
 from django_delayed_union import DelayedUnionQuerySet
 from django_delayed_union.base import DelayedQuerySetMethod
 from .base import BaseNode
-
-
-# NOTE: replace broken CTEManager
-class CTEManager(models.Manager):
-    """Manager for models that perform CTE queries"""
-
-    @classmethod
-    def from_queryset(cls, queryset_class, class_name=None):
-        assert issubclass(queryset_class, CTEQuerySet)
-        return super().from_queryset(queryset_class, class_name=class_name)
 
 
 ProtoNodeManager = CTEManager
