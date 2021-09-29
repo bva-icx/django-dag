@@ -41,7 +41,7 @@ class RecurseDictNode(template.Node):
                         child_items = v.items()
                         output.append(self.renderCallback(
                             context, child_items, level + 1))
-                    except:
+                    except Exception:
                         output.append(str(v))
 
             if 'endloop' in self.nodeList:
