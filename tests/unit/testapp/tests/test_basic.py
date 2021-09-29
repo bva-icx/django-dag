@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db.models import Max
 from django.db import models
 from django.test import TestCase
-from django.shortcuts import render
+from django.template import loader
 from django.core.exceptions import ValidationError
 from .tree_test_output import expected_tree_output
 from ..models.basic import BasicNode, BasicEdge, BasicNodeES, BasicEdgeES
@@ -623,8 +623,8 @@ class DagStructureTests(TestCase):
 
     def test_dag_tree_render(self):
         # Testing the view
-        response = render(None, 'tree.html', {'dag_list': self.nodeToTest.objects.all()})
-        self.assertEqual(response.content.decode('utf-8'), expected_tree_output)
+        content = loader.render_to_string('tree.html', {'dag_list': self.nodeToTest.objects.all()})
+        self.assertEqual(content, expected_tree_output)
 
     @unittest.skip('todo')
     def test_can_move_a_node_between_parents():
