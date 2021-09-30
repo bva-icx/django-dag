@@ -1,3 +1,5 @@
+from abc import ABC, abstractmethod
+from typing import List
 from django.db import models
 from django.db.models.functions import (
     Cast,
@@ -58,6 +60,108 @@ class SplitPassthroughMethod(DelayedQuerySetMethod):
 
 class DagDelayedUnionQuerySet(DelayedUnionQuerySet):
     with_sort_sequence = SplitPassthroughMethod()
+
+
+class DagCteAnnotation(ABC):
+    @abstractmethod
+    def as_initial_expresion(self, cte):
+        """
+        Convert to tuple (name, Expression) which forms the annotation for
+        the initial query in the CTE
+
+        :rtype: tuple( str, Union[`django.db.models.Expression`, Function:->`django.db.models.Expression`])
+        :return: tuple of
+            * Name of annotation or CTE table column
+            * Expression forming the annotation
+        """
+        pass
+
+    @abstractmethod
+    def as_recursive_expresion(self, cte):
+        """
+        Convert to tuple (name, Expression) which forms the annotation for
+        the recursive part of query in the CTE
+
+        :rtype: tuple( str, Union[`django.db.models.Expression`, Function:->`django.db.models.Expression`])
+        :return: tuple of
+            * Name of annotation or CTE table column
+            * Expression forming the annotation
+        """
+        pass
+
+
+class CteRawAnnotation(DagCteAnnotation):
+    """
+    A simple DagCteAnnotation where the initial and recursive part are raw expressions
+    or functions returning expressions.
+    """
+    def __init__(self, name, initial, recursive) -> None:
+        self.name = name
+        self.initial = initial
+        self.recursive = recursive
+
+    def as_initial_expresion(self, cte):
+        if callable(self.initial):
+            return (self.name, self.initial(cte))
+        return (self.name, self.initial)
+
+    def as_recursive_expresion(self, cte):
+        if callable(self.recursive):
+            return (self.name, self.recursive(cte))
+        return (self.name, self.recursive)
+
+
+class CteSimpleConcatAnnotation(DagCteAnnotation):
+    def __init__(
+            self,
+            name: str,
+            initial_sequence_field,
+            next_sequence_field,
+            path_seperator: str = _PATH_SEPERATOR,
+            padsize: int = _PATH_PADDING_SIZE,
+            padding_character: str = _PATH_PADDING_CHAR
+    ) -> None:
+        """
+        :param name: Name of the annotation  or CTE table column
+        :param initial_sequence_field: An expression or F() used to from the initial value
+            of the path
+        :param next_sequence_field: An expression or F() used to get the next part of the
+            combined path field.
+        :param path_seperator (str): Character to put between fields
+        :param padsize (int): The number of characters that the field should be when padded
+        :param padding_character (str): character to pad the field
+        """
+        self.name = name
+        self.initial_sequence_field = initial_sequence_field
+        self.next_sequence_field = next_sequence_field
+        self.path_seperator = path_seperator
+        self.padsize = padsize
+        self.padding_character = padding_character
+
+    def _LPad(self, value):
+        return LPad(
+            Cast(value, output_field=models.TextField()),
+            self.padsize, Value(self.padding_character))
+
+    def as_initial_expresion(self, cte):
+        return (
+            self.name,
+            Concat(
+                self._LPad(self.initial_sequence_field),
+                Value(self.path_seperator),
+                self._LPad(self.next_sequence_field)
+            )
+        )
+
+    def as_recursive_expresion(self, cte):
+        return (
+            self.name,
+            Concat(
+                getattr(cte.col, self.name),
+                Value(self.path_seperator),
+                self._LPad(self.next_sequence_field),
+                output_field=models.TextField(),)
+        )
 
 
 class ProtoNodeQuerySet(CTEQuerySet):
@@ -153,7 +257,15 @@ class ProtoNodeQuerySet(CTEQuerySet):
             self._make_path_src_cte_fn(
                 node_model,
                 search_roots,
-                sequence_field if sequence_field else F('child_id'),
+                [
+                    CteSimpleConcatAnnotation(
+                        'querypath',
+                        F('parent_id'),
+                        sequence_field if sequence_field else F('child_id'),
+                        self.path_seperator,
+                        padsize
+                    )
+                ],
                 padsize
             ),
             name='nodePaths' + sort_name
@@ -184,7 +296,29 @@ class ProtoNodeQuerySet(CTEQuerySet):
             })
         return subnodes, roots
 
-    def _make_path_src_cte_fn(self, model, values, sequence_field, padsize):
+    def _make_path_src_cte_fn(self, model, rootquery, sequence_fields: List[DagCteAnnotation], padsize):
+        """
+        Build the CTE query function for dag path navigation
+
+        :param model:
+        :param rootquery: ids for root nodes
+        :param sequence_fields: List<DagCteAnnotation> to form the CTE
+        """
+        annotations = sequence_fields.copy()
+        annotations.extend([
+            CteSimpleConcatAnnotation(
+                'path',
+                F('parent_id'),
+                F('child_id'),
+                self.path_seperator,
+                padsize
+            ),
+            CteRawAnnotation(
+                'depth',
+                Value(1, output_field=models.IntegerField()),
+                lambda cte: cte.col.depth + Value(1, output_field=models.IntegerField()),
+            )
+        ])
         return model._base_tree_cte_builder(
             'parent_id',
             'cid',
@@ -193,34 +327,9 @@ class ProtoNodeQuerySet(CTEQuerySet):
                 'cid': F('child_id'),
                 'pid': F('parent_id'),
             },
-            {
-                'querypath': Concat(
-                    self._LPad(F('parent_id'), padsize),
-                    Value(self.path_seperator),
-                    self._LPad(sequence_field, padsize)
-                ),
-                'path': Concat(
-                    self._LPad(F('parent_id'), padsize),
-                    Value(self.path_seperator),
-                    self._LPad(F('child_id'), padsize)
-                ),
-                'depth': Value(1, output_field=models.IntegerField())
-            },
-            (lambda cte: {
-                'querypath': Concat(
-                    cte.col.querypath,
-                    Value(self.path_seperator),
-                    self._LPad(sequence_field, padsize),
-                    output_field=models.TextField(),),
-                'path': Concat(
-                    cte.col.path,
-                    Value(self.path_seperator),
-                    self._LPad(F('child_id'), padsize),
-                    output_field=models.TextField(),),
-                'depth': cte.col.depth + Value(1, output_field=models.IntegerField())
-            }
-            ),
-            {'parent__in': values}
+            (lambda cte: dict(map(lambda field: field.as_initial_expresion(cte), annotations))),
+            (lambda cte: dict(map(lambda field: field.as_recursive_expresion(cte), annotations))),
+            {'parent__in': rootquery}
         )
 
 
