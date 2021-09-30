@@ -2,6 +2,10 @@ from django_dag.models.order_control import Position
 import unittest
 from django.conf import settings
 from django.test import TestCase
+from django.db.models import TextField
+from django.db.models.expressions import F, Value
+from django.db.models.functions import Cast, Concat, RPad
+
 from ..models.ordered import EdgeOrderedNode, OrderedEdge
 from ..models.ordered import OrderedNode
 
@@ -181,7 +185,6 @@ class EdgeSortedDagRelationshipTests(TestCase):
                 DagSortOrder.NODE_SEQUENCE,
                 padsize=2,
             ).order_by('dag_pk_path')
-
             self.assertEqual(
                 tuple(
                     qs_sorted.values_list(
@@ -208,6 +211,51 @@ class EdgeSortedDagRelationshipTests(TestCase):
                     (9, '09', '09'),
                     (14, '14', '14'),
                     (15, '15', '15')
+                )
+            )
+
+    def test_queryset_sortting_filter_breathfirst(self):
+        for i in range(10, 16):
+            n = EdgeOrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        self.nodes.p6.insert_child_after(self.nodes.p10, None)
+        self.nodes.p6.insert_child_after(self.nodes.p11, self.nodes.p10)
+        self.nodes.p10.insert_child_after(self.nodes.p12, None)
+        self.nodes.p2.remove_child(self.nodes.p6)
+        self.nodes.p2.add_child(self.nodes.p3, sequence=9)
+        self.nodes.p3.add_child(self.nodes.p13, sequence=6)
+
+        with self.subTest(msg="with no cloned nodes"):
+            qs = EdgeOrderedNode.objects.all()
+            qs_sorted = qs.with_sort_sequence(
+                padsize=2,
+            ).order_by('dag_depth', 'dag_sequence_path')
+            self.assertEqual(
+                tuple(
+                    map(
+                        lambda row: row[: 2],
+                        qs_sorted.values_list('pk', 'dag_sequence_path', 'dag_depth')
+                    )
+                ),
+                (
+                    (1, '01'),
+                    (2, '02'),
+                    (4, '04'),
+                    (8, '08'),
+                    (9, '09'),
+                    (14, '14'),
+                    (15, '15'),
+                    (7, '01,04'),
+                    (6, '01,08'),
+                    (5, '01,12'),
+                    (5, '02,01'),
+                    (7, '02,04'),
+                    (3, '02,09'),
+                    (10, '01,08,50'),
+                    (11, '01,08,75'),
+                    (13, '02,09,06'),
+                    (12, '01,08,50,50'),
                 )
             )
 
@@ -367,7 +415,6 @@ class EdgeSortedDagRelationshipTests(TestCase):
                 )
             )
 
-    @unittest.expectedFailure
     def test_queryset_sortting_filter_depthfirst_postorder(self):
         for i in range(10, 16):
             n = EdgeOrderedNode(name="%s" % i)
@@ -383,17 +430,30 @@ class EdgeSortedDagRelationshipTests(TestCase):
         with self.subTest(msg="with no cloned nodes"):
             qs = EdgeOrderedNode.objects.all()
             qs_sorted = qs.with_sort_sequence(
-                DagSortOrder.NODE_SEQUENCE,
                 padsize=2,
-            ).order_by('dag_sequence_path')
+            ).annotate(
+                dag_postorder_path=RPad(
+                    Concat(
+                        Cast(F('dag_sequence_path'), output_field=TextField()),
+                        Value(','),
+                    ),
+                    (2 + 1) * 5,
+                    Value('A')
+                )
+            ).order_by('dag_postorder_path')
             self.assertEqual(
-                tuple(qs_sorted.values_list('pk', 'dag_sequence_path')),
+                tuple(
+                    map(
+                        lambda row: row[: 2],
+                        qs_sorted.values_list('pk', 'dag_sequence_path', 'dag_postorder_path')
+                    )
+                ),
                 (
                     (7, '01,04'),
                     (12, '01,08,50,50'),
                     (10, '01,08,50'),
-                    (6, '01,08'),
                     (11, '01,08,75'),
+                    (6, '01,08'),
                     (5, '01,12'),
                     (1, '01'),
                     (5, '02,01'),
@@ -405,11 +465,11 @@ class EdgeSortedDagRelationshipTests(TestCase):
                     (8, '08'),
                     (9, '09'),
                     (14, '14'),
-                    (15, '15')
+                    (15, '15'),
                 )
             )
 
-    @unittest.expectedFailure
+    @unittest.skip('no exception or test written as yet')
     def test_queryset_sortting_filter_depthfirst_inorder(self):
         pass
 
