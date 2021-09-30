@@ -1,15 +1,24 @@
+from _typeshed import OpenBinaryModeReading
+
+
 Django DAG
 ----------
 
 .. Note:
+    This is an unoffical 2 branch for Python 3 and Django2.2+ compatibility,
 
-    This is an unoffical 1.5.0 branch for Python 3 and Django2.2+ compatibility,
-    every thing on this branch except the version number has either been pulle
-    by elapso/django-dag or is an outstanding PR.
-    (With the exception of the NodeOrdering, which iwll become a PR 
-     once we have unittests )
-    Ths version number has been bumped purely to aid the installation tools,
-    and may not have all the features that the upstream 1.5.0 ends up with
+    This version number has been bumped purely to aid the installation tools,
+    and may not have all the features that the upstream 2 ends up with.
+
+    It is our intention to get as mush of this submitted as PR although
+    there is significant changes and some breaking changes to the version 1
+    branch
+
+    This version adds support for:
+    * Node Ordering
+    * Node Sorting
+    * Runtime Optional CTE support
+
 
 Django-dag is a small reusable app which implements a Directed Acyclic Graph.
 
@@ -47,7 +56,7 @@ Unit tests can be run with just django installed at the base directory by runnin
 Breaking changes
 ................
    * The name of function Parents remove and parents is now a ManyRelatedManager the same
-     as children.  change parents() to parents.all()
+     as children.  Change parents() to parents.all()
    * node_set() is now the clan property  (depreciated version available)
    * descendant_set() is now the descendants property (depreciated version available)
    * ancestor_set() is now the ancestors property (depreciated version available)
