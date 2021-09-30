@@ -119,7 +119,7 @@ class CteSimpleConcatAnnotation(DagCteAnnotation):
             next_sequence_field,
             path_seperator: str = _PATH_SEPERATOR,
             padsize: int = _PATH_PADDING_SIZE,
-            padding_character: str = _PATH_PADDING_CHAR
+            padding: str = _PATH_PADDING_CHAR,
     ) -> None:
         """
         :param name: Name of the annotation  or CTE table column
@@ -129,19 +129,19 @@ class CteSimpleConcatAnnotation(DagCteAnnotation):
             combined path field.
         :param path_seperator (str): Character to put between fields
         :param padsize (int): The number of characters that the field should be when padded
-        :param padding_character (str): character to pad the field
+        :param padding (str): character to pad the field
         """
         self.name = name
         self.initial_sequence_field = initial_sequence_field
         self.next_sequence_field = next_sequence_field
         self.path_seperator = path_seperator
         self.padsize = padsize
-        self.padding_character = padding_character
+        self.padding = padding
 
     def _LPad(self, value):
         return LPad(
             Cast(value, output_field=models.TextField()),
-            self.padsize, Value(self.padding_character))
+            self.padsize, Value(self.padding))
 
     def as_initial_expresion(self, cte):
         return (
@@ -262,9 +262,9 @@ class ProtoNodeQuerySet(CTEQuerySet):
                         'querypath',
                         F('parent_id'),
                         sequence_field if sequence_field else F('child_id'),
-                        self.path_seperator,
-                        padsize
-                    )
+                        path_seperator=self.path_seperator,
+                        padsize=padsize
+                    ),
                 ],
                 padsize
             ),
