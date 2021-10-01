@@ -623,7 +623,7 @@ class DagStructureTests(TestCase):
 
     def test_dag_tree_render(self):
         # Testing the view
-        content = loader.render_to_string('tree.html', {'dag_list': self.nodeToTest.objects.all()})
+        content = loader.render_to_string('django_dag/tree.html', {'dag_list': self.nodeToTest.objects.all()})
         self.assertEqual(content, expected_tree_output)
 
     @unittest.skip('todo')

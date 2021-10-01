@@ -1,5 +1,0 @@
-MANIFEST.in
-README
-setup.py
-django_dag/__init__.py
-django_dag/models.py
