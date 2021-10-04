@@ -209,7 +209,7 @@ def node_factory(edge_model,
             abstract = True
 
         objects = node_manager() if queryset is None else node_manager.from_queryset(queryset)()
-        children = models.ManyToManyField(
+        children = field(
             'self',
             blank=children_null,
             symmetrical=False,
