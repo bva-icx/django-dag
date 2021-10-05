@@ -45,71 +45,75 @@ class BaseNodeQuerySet(backend.ProtoNodeQuerySet):
         """
         Provides annotations to enable sorting of the DAG nodes.
 
+        This add the annotations:
+            * dag_depth: Depth of the node from it root.
+            * dag_node_path: A str representation list of the nodes visited from root to node
+
+        Differing sorting orders can be achieved using these annotations.
+            DFS - Depth First Search
+                1 - 'Inorder (Left, Root, Right)' sort
+                    Unsupported
+
+                2 - 'preorder (Root, Left, Right)' sort
+                    This sort order is available for both dag with and without
+                    an implicit sequence, if you are using unsorted dags it is
+                    assumed the 'pk' is the sequence.
+
+                    Example::
+
+                        nodesQuery.with_sort_sequence().order_by('dag_node_path')
+
+                    or for sortable dags:
+
+                    Example::
+
+                        nodesQuery.with_sort_sequence().order_by('dag_sequence_path')
+
+                    Sortable dags can be treated as unsorted and still use order by
+                    'dag_node_path' ordering.
+
+                3 - 'Postorder (Left, Right, Root)' sort
+                    This can be achieved, but isn't directly support as will require multiple
+                    queries to obtain value needed for maxdepth and possibly padsize.
+                    `maxdepth` value needs to be the maximum depth of the dag
+                    other valuse needed:
+                    `padsize` is the size to render the sequence or pk field
+                    `sepchar` is the path seperator charater this can be ''
+                    `padchar` is the a character > in sort order than the any char in the sequence of pk field.
+
+                    Example::
+
+                        from django.db.models import TextField
+                        from django.db.models.expressions import F, Value
+                        from django.db.models.functions import Cast, Concat, RPad
+                        nodesQuery.with_sort_sequence().annotate(
+                            dag_postorder_path=RPad(
+                                Concat(
+                                    Cast(F('dag_sequence_path'), output_field=TextField()),
+                                    Value(sepchar),
+                                ),
+                                (padsize + 1) * maxdepth,
+                                Value(padchar)
+                            )
+                        ).order_by('dag_postorder_path')
+
+            BFT - Breath First Search
+                This sort order available by
+                Example::
+
+                    nodesQuery.with_sort_sequence().order_by('dag_depth, 'dag_sequence_path')
+
         Notes:
             * This method call can be SLOW and if not using CTE's as this reqires a full
               dag fetch to computer the order.
             * Nodes with multiple roots will be present in the results multiple time, as
               the dag is 'unrolled'.
 
-        This add the annotations:
-            * dag_depth: Depth of the node from it root.
-            * dag_node_path: A str representation list of the nodes visited from root to node
-
-
-        Differing sorting orders can be achieved using these annotations.
-            DFS: Depth First Search
-                1: 'Inorder (Left, Root, Right)' sort
-                    Unsupported
-
-                2: 'preorder (Root, Left, Right)' sort
-                    This sort order is available for both dag with and without
-                    an implicit sequence, if you are using unsorted dags it is
-                    assumed the 'pk' is the sequence.
-                    ie:
-                        nodesQuery.with_sort_sequence().order_by('dag_node_path')
-
-                    or for sortable dags:
-                        nodesQuery.with_sort_sequence().order_by('dag_sequence_path')
-
-                    Sortable dags can be treated as unsorted and still use order by
-                    'dag_pk_path'.
-
-                3: 'Postorder (Left, Right, Root)' sort
-                    This can be achieved, but isn't directly support as will require multiple
-                    queries to obtain value needed for maxdepth and possibly padsize.
-                        `maxdepth` value needs to be the maximum depth of the dag
-
-                    other valuse needed:
-                        `padsize` is the size to render the sequence or pk field
-                        `sepchar` is the path seperator charater this can be ''
-                        `padchar` is the a character > in sort order than the any char in
-                            the sequence of pk field.
-
-                    from django.db.models import TextField
-                    from django.db.models.expressions import F, Value
-                    from django.db.models.functions import Cast, Concat, RPad
-                    nodesQuery.with_sort_sequence().annotate(
-                        dag_postorder_path=RPad(
-                            Concat(
-                                Cast(F('dag_sequence_path'), output_field=TextField()),
-                                Value(sepchar),
-                            ),
-                            (padsize + 1) * maxdepth,
-                            Value(padchar)
-                        )
-                    ).order_by('dag_postorder_path')
-
-            BFT: Breath First Search
-                This sort order available by
-
-                nodesQuery.with_sort_sequence().order_by(
-                    'dag_depth, 'dag_sequence_path')
 
         :param method `DagSortOrder`: The sort method to use.
-            DEFAULT: For sortable dags this is DagSortOrder.NODE_SEQUENCE
-                else DagSortOrder.NODE_PK
-            NODE_PK : Add the basic annotations 'dag_pk_path'
-            NODE_SEQUENCE : The basic annotations and 'dag_sequence_path'
+            DEFAULT:: For sortable dags this is DagSortOrder.NODE_SEQUENCE else DagSortOrder.NODE_PK
+            NODE_PK:: Add the basic annotations 'dag_pk_path'
+            NODE_SEQUENCE:: The basic annotations and 'dag_sequence_path'
         :return: QuerySet
         """
         if method == DagSortOrder.DEFAULT:
