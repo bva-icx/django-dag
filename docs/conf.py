@@ -155,7 +155,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'django-dag-admin', u'Django Dag Documention',
+    (master_doc, 'django-dag', u'Django Dag Documention',
      [author], 1)
 ]
 
@@ -174,3 +174,4 @@ texinfo_documents = [
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {'https://docs.python.org/': None}
+issues_uri = 'https://github.com/bva/django-dag/issues/{issue}'
