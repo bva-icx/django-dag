@@ -7,5 +7,5 @@ htmlcov/
 .htmlcov
 
 # build artifacts
-src/django_cte/_version.py
+src/django_dag/_version.py
 /dist/
