@@ -3,5 +3,9 @@
 .tox/
 htmlcov/
 .vscode/
-.coverage
+.coverage*
 .htmlcov
+
+# build artifacts
+src/django_cte/_version.py
+/dist/
