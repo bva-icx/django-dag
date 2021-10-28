@@ -227,21 +227,21 @@ class EdgeSortedDagRelationshipTests(TestCase):
         self.nodes.p2.add_child(self.nodes.p3, sequence=9)
         self.nodes.p3.add_child(self.nodes.p13, sequence=6)
         expected_nodes = (
-            (1, '01',),
-            (5, '01,05'),
-            (6, '01,06'),
-            (10, '01,06,10'),
-            (12, '01,06,10,12'),
-            (11, '01,06,11'),
-            (7, '01,07'),
-            (2, '02'),
-            (3, '02,03'),
-            (13, '02,03,13'),
-            (4, '04'),
-            (8, '08'),
-            (9, '09'),
-            (14, '14'),
-            (15, '15')
+            (1, '0001',),
+            (5, '0001,0005'),
+            (6, '0001,0006'),
+            (10, '0001,0006,0010'),
+            (12, '0001,0006,0010,0012'),
+            (11, '0001,0006,0011'),
+            (7, '0001,0007'),
+            (2, '0002'),
+            (3, '0002,0003'),
+            (13, '0002,0003,0013'),
+            (4, '0004'),
+            (8, '0008'),
+            (9, '0009'),
+            (14, '0014'),
+            (15, '0015')
         )
         qs = EdgeOrderedNode.objects.all()
         with self.subTest(msg="query sort order same as visit sort"):
@@ -917,6 +917,225 @@ class EdgeSortedDagRelationshipTests(TestCase):
             [self.nodes.p7.pk, self.nodes.p6.pk,
                 self.nodes.p5.pk, self.nodes.p9.pk]
         )
+
+    def test_queryset_sortting_with_nosep(self):
+        for i in range(10, 16):
+            n = EdgeOrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        self.nodes.p6.insert_child_after(self.nodes.p10, None)
+        self.nodes.p6.insert_child_after(self.nodes.p11, self.nodes.p10)
+        self.nodes.p10.insert_child_after(self.nodes.p12, None)
+        self.nodes.p2.remove_child(self.nodes.p6)
+        self.nodes.p2.add_child(self.nodes.p3, sequence=9)
+        self.nodes.p3.add_child(self.nodes.p13, sequence=6)
+
+        with self.subTest(msg="with no cloned nodes"):
+            qs = EdgeOrderedNode.objects.all()
+            qs_sorted = qs.with_sort_sequence(
+                    padsize=3,
+                    padchar='0',
+                    sepchar=''
+            ).order_by('dag_node_path')
+            self.assertEqual(
+                tuple(
+                    qs_sorted.values_list(
+                        'pk',
+                        'dag_sequence_path',
+                        'dag_node_path',
+                    )
+                ),
+                (
+                    (1, '001', '0001'),
+                    (5, '001012', '0001,0005'),
+                    (6, '001008', '0001,0006'),
+                    (10, '001008050', '0001,0006,0010'),
+                    (12, '001008050050', '0001,0006,0010,0012'),
+                    (11, '001008075', '0001,0006,0011'),
+                    (7, '001004', '0001,0007'),
+                    (2, '002', '0002'),
+                    (3, '002009', '0002,0003'),
+                    (13, '002009006', '0002,0003,0013'),
+                    (5, '002001', '0002,0005'),
+                    (7, '002004', '0002,0007'),
+                    (4, '004', '0004'),
+                    (8, '008', '0008'),
+                    (9, '009', '0009'),
+                    (14, '014', '0014'),
+                    (15, '015', '0015')
+                )
+            )
+
+    def test_queryset_sortting_with_custom_query(self):
+        for i in range(10, 16):
+            n = EdgeOrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        self.nodes.p6.insert_child_after(self.nodes.p10, None)
+        self.nodes.p6.insert_child_after(self.nodes.p11, self.nodes.p10)
+        self.nodes.p10.insert_child_after(self.nodes.p12, None)
+        self.nodes.p2.remove_child(self.nodes.p6)
+        self.nodes.p2.add_child(self.nodes.p3, sequence=9)
+        self.nodes.p3.add_child(self.nodes.p13, sequence=6)
+
+        class CustomQuerySet(EdgeOrderedNode.objects._queryset_class):
+            path_padding_size = 2
+            path_padding_char = ' '
+            path_seperator = '+'
+
+        class TestSortableCSModel(EdgeOrderedNode):
+            class Meta:
+                proxy = True
+            objects = EdgeOrderedNode._default_manager.from_queryset(CustomQuerySet)()
+
+        with self.subTest(msg="with no cloned nodes"):
+            qs = TestSortableCSModel.objects.all()
+            qs_sorted = qs.with_sort_sequence(
+                    padsize=3,
+                    padchar='0',
+                    sepchar=','
+            ).order_by('dag_node_path')
+            self.assertEqual(
+                tuple(
+                    qs_sorted.values_list(
+                        'pk',
+                        'dag_sequence_path',
+                        'dag_node_path',
+                    )
+                ),
+                (
+                    (1, '001', ' 1'),
+                    (5, '001,012', ' 1+ 5'),
+                    (6, '001,008', ' 1+ 6'),
+                    (10, '001,008,050', ' 1+ 6+10'),
+                    (12, '001,008,050,050', ' 1+ 6+10+12'),
+                    (11, '001,008,075', ' 1+ 6+11'),
+                    (7, '001,004', ' 1+ 7'),
+                    (2, '002', ' 2'),
+                    (3, '002,009', ' 2+ 3'),
+                    (13, '002,009,006', ' 2+ 3+13'),
+                    (5, '002,001', ' 2+ 5'),
+                    (7, '002,004', ' 2+ 7'),
+                    (4, '004', ' 4'),
+                    (8, '008', ' 8'),
+                    (9, '009', ' 9'),
+                    (14, '014', '14'),
+                    (15, '015', '15')
+                )
+            )
+
+    def test_queryset_sortting_with_mixed_different_settings(self):
+        for i in range(10, 16):
+            n = EdgeOrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        self.nodes.p6.insert_child_after(self.nodes.p10, None)
+        self.nodes.p6.insert_child_after(self.nodes.p11, self.nodes.p10)
+        self.nodes.p10.insert_child_after(self.nodes.p12, None)
+        self.nodes.p2.remove_child(self.nodes.p6)
+        self.nodes.p2.add_child(self.nodes.p3, sequence=9)
+        self.nodes.p3.add_child(self.nodes.p13, sequence=6)
+
+        with self.subTest(msg="with no cloned nodes"):
+            qs = EdgeOrderedNode.objects.all()
+            qs_sorted = qs.with_sort_sequence(
+                DagSortOrder.NODE_PK,
+                padsize=2,
+                padchar='-',
+                sepchar='+',
+            )
+            qs_sorted = qs_sorted.with_sort_sequence(
+                DagSortOrder.NODE_SEQUENCE,
+                padsize=3,
+                padchar='0',
+                sepchar='-',
+            ).order_by('dag_pk_path')
+            self.assertEqual(
+                tuple(
+                    qs_sorted.values_list(
+                        'pk',
+                        'dag_sequence_path',
+                        'dag_pk_path',
+                        'dag_node_path'
+                    )
+                ),
+                (
+                    (1, '001', '-1', '0001'),
+                    (5, '001-012', '-1+-5', '0001,0005'),
+                    (6, '001-008', '-1+-6', '0001,0006'),
+                    (10, '001-008-050', '-1+-6+10', '0001,0006,0010'),
+                    (12, '001-008-050-050', '-1+-6+10+12', '0001,0006,0010,0012'),
+                    (11, '001-008-075', '-1+-6+11', '0001,0006,0011'),
+                    (7, '001-004', '-1+-7', '0001,0007'),
+                    (2, '002', '-2', '0002'),
+                    (3, '002-009', '-2+-3', '0002,0003'),
+                    (13, '002-009-006', '-2+-3+13', '0002,0003,0013'),
+                    (5, '002-001', '-2+-5', '0002,0005'),
+                    (7, '002-004', '-2+-7', '0002,0007'),
+                    (4, '004', '-4', '0004'),
+                    (8, '008', '-8', '0008'),
+                    (9, '009', '-9', '0009'),
+                    (14, '014', '14', '0014'),
+                    (15, '015', '15', '0015')
+                )
+            )
+
+    def test_queryset_sortting_with_double_used_different_settings(self):
+        for i in range(10, 16):
+            n = EdgeOrderedNode(name="%s" % i)
+            n.save()
+            setattr(self.nodes, "p%s" % i, n)
+        self.nodes.p6.insert_child_after(self.nodes.p10, None)
+        self.nodes.p6.insert_child_after(self.nodes.p11, self.nodes.p10)
+        self.nodes.p10.insert_child_after(self.nodes.p12, None)
+        self.nodes.p2.remove_child(self.nodes.p6)
+        self.nodes.p2.add_child(self.nodes.p3, sequence=9)
+        self.nodes.p3.add_child(self.nodes.p13, sequence=6)
+
+        with self.subTest(msg="with no cloned nodes"):
+            qs = EdgeOrderedNode.objects.all()
+            qs_sorted = qs.with_sort_sequence(
+                DagSortOrder.NODE_SEQUENCE,
+                padsize=2,
+                padchar='-',
+                sepchar='+',
+                name='custom_path'
+            )
+            qs_sorted = qs_sorted.with_sort_sequence(
+                DagSortOrder.NODE_SEQUENCE,
+                padsize=3,
+                padchar='0',
+                sepchar='-',
+            ).order_by('dag_node_path')
+            self.assertEqual(
+                tuple(
+                    qs_sorted.values_list(
+                        'pk',
+                        'dag_sequence_path',
+                        'custom_path',
+                        'dag_node_path'
+                    )
+                ),
+                (
+                    (1, '001', '-1', '0001'),
+                    (5, '001-012', '-1+12', '0001,0005'),
+                    (6, '001-008', '-1+-8', '0001,0006'),
+                    (10, '001-008-050', '-1+-8+50', '0001,0006,0010'),
+                    (12, '001-008-050-050', '-1+-8+50+50', '0001,0006,0010,0012'),
+                    (11, '001-008-075', '-1+-8+75', '0001,0006,0011'),
+                    (7, '001-004', '-1+-4', '0001,0007'),
+                    (2, '002', '-2', '0002'),
+                    (3, '002-009', '-2+-9', '0002,0003'),
+                    (13, '002-009-006', '-2+-9+-6', '0002,0003,0013'),
+                    (5, '002-001', '-2+-1', '0002,0005'),
+                    (7, '002-004', '-2+-4', '0002,0007'),
+                    (4, '004', '-4', '0004'),
+                    (8, '008', '-8', '0008'),
+                    (9, '009', '-9', '0009'),
+                    (14, '014', '14', '0014'),
+                    (15, '015', '15', '0015')
+                )
+            )
 
 
 class NodeSortedDagRelationshipTests(TestCase):

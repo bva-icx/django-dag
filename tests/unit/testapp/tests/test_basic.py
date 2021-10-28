@@ -698,6 +698,40 @@ class NodeCoreSortRelationshipTests(TestCase):
             ]
         )
 
+    def test_custom_size(self,):
+        self.nodes.p6.add_child(self.nodes.p9)
+        self.nodes.p4.add_child(self.nodes.p9)
+
+        class CustomQuerySet(BasicNode.objects._queryset_class):
+            path_padding_size = 3
+            path_padding_char = '-'
+            path_seperator = '+'
+
+        class TestCSModel(BasicNode):
+
+            class Meta:
+                proxy = True
+
+            objects = BasicNode._default_manager.from_queryset(CustomQuerySet)()
+
+        qs = TestCSModel.objects.filter(pk__in=[3, 4, 5, 7, 8, 9])
+        qs_withsort = qs.with_sort_sequence(
+            DagSortOrder.NODE_PK,
+        )
+        qs_sorted = qs_withsort.order_by('dag_pk_path') \
+            .values_list('pk', 'dag_pk_path')
+        self.assertEqual(
+            list(qs_sorted), [
+                (3, '--1+--3'),
+                (4, '--1+--4'),
+                (9, '--1+--4+--9'),
+                (5, '--1+--5'),
+                (9, '--2+--6+--9'),
+                (7, '--2+--7'),
+                (8, '--2+--8'),
+            ]
+        )
+
     def test_cope_with_sort_on_known_empty_query(self,):
         qs = BasicNode.objects.none()
         qs_withsort = qs.with_sort_sequence(

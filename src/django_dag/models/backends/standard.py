@@ -19,6 +19,11 @@ from django.db.models.functions import (
 from django_delayed_union.base import DelayedQuerySetMethod
 from .base import BaseNode
 from .query import DagBaseDelayedUnionQuerySet
+from . import (
+    QUERY_PATH_FIELDNAME_FORMAT,
+    QUERY_DEPTH_FIELDNAME,
+    QUERY_NODE_PATH,
+)
 
 
 ProtoNodeManager = models.Manager
@@ -26,15 +31,7 @@ ProtoEdgeManager = models.Manager
 ProtoEdgeQuerySet = QuerySet
 
 
-_PATH_PADDING_SIZE = 4
-_PATH_PADDING_CHAR = '0'
-_PATH_SEPERATOR = ','
 _QUERY_ORDER_FIELDNAME = 'dag_order_sequence'
-
-QUERY_ORDER_FIELDNAME_FORMAT = 'dag_%(name)s_sequence'
-QUERY_PATH_FIELDNAME_FORMAT = 'dag_%(name)s_path'
-QUERY_NODE_PATH = 'dag_node_path'
-QUERY_DEPTH_FIELDNAME = 'dag_depth'
 
 
 class ReflowPrimeQueryMethod(DelayedQuerySetMethod):
@@ -146,21 +143,21 @@ def filter_order_with_annotations(queryset,
 
 
 class ProtoNodeQuerySet(QuerySet):
-    padsize = _PATH_PADDING_SIZE
 
     def __init__(self, *args, **kwargs):
-        self.path_seperator = _PATH_SEPERATOR
-        self.path_padding_character = _PATH_PADDING_CHAR
-        self.padding_size = _PATH_PADDING_SIZE
         super().__init__(*args, **kwargs)
 
-    def _LPad_sql(self, value, padsize):
+    def _LPad_sql(self, value, padding_size=None, padding_char=None):
+        padding_size = padding_size or self._padding_size
+        padding_char = padding_char or self._padding_char
         return LPad(
             Cast(value, output_field=models.TextField()),
-            padsize, Value(self.path_padding_character))
+            padding_size, Value(padding_char))
 
-    def _LPad_py(self, value, padsize):
-        return str(value).rjust(padsize, self.path_padding_character)
+    def _LPad_py(self, value, padding_size=None, padding_char=None):
+        padding_size = padding_size or self._padding_size
+        padding_char = padding_char or self._padding_char
+        return str(value).rjust(padding_size, padding_char)
 
     def distinct_node(self, order_field: str, roots: QuerySet = None, **kwargs):
         """
@@ -202,31 +199,26 @@ class ProtoNodeQuerySet(QuerySet):
             self._build_query_fn(out_data, model=model, annotations_fields=annotations_fields)
         )
 
-    def with_pk_path(self, *args,
-            padsize=_PATH_PADDING_SIZE, padchar=_PATH_PADDING_CHAR, **kwargs):
+    def with_pk_path(self, *args, name=None, **kwargs):
         """
         Generates a query that does a top-to-bottom traversal without regard to any
         possible (left-to-right) ordering of the nodes
-
-        :param padsize int: Length of the field segment for each node in pits path
-            to it root.
         """
+        if name is None:
+            name = QUERY_PATH_FIELDNAME_FORMAT % {'name': 'pk', }
+
         model, data, query_fn = self._sort_query(*args,
-            padsize=padsize, sort_name='pk', **kwargs)
+            path_filedname=name, **kwargs)
 
         return model._convert_to_lazy_node_query(
             data,
             query_fn(data)
         )
 
-    def with_sequence_path(self, *args,
-            padsize=_PATH_PADDING_SIZE, padchar=_PATH_PADDING_CHAR, **kwargs):
+    def with_sequence_path(self, *args, name=None, **kwargs):
         """
         Generates a query that does a depth-first traversal, this account for the nodes
         sequence ordering (left-to-right) of the nodes.
-
-        :param padsize int: Length of the field segment for each node in pits path
-            to it root.
         """
         sequence_field = None
         if self.model.sequence_manager:
@@ -235,12 +227,12 @@ class ProtoNodeQuerySet(QuerySet):
                     self.model, 'child', 'parent',
                     parent_filter_ref=models.OuterRef('path_parent_ref')
                 )
+        if name is None:
+            name = QUERY_PATH_FIELDNAME_FORMAT % {'name': 'sequence', }
 
         model, data, query_fn = self._sort_query(
                 *args,
-                padsize=padsize,
-                sort_name='sequence',
-                padchar=padchar,
+                path_filedname=name,
                 sequence_field=sequence_field,
                 **kwargs)
 
@@ -291,16 +283,11 @@ class ProtoNodeQuerySet(QuerySet):
 
     def _sort_query(
             self, *args,
-            padsize=_PATH_PADDING_SIZE,
-            padchar=_PATH_PADDING_CHAR,
-            sepchar=_PATH_SEPERATOR,
             sequence_field=None,
-            sort_name='sort',
+            path_filedname=QUERY_PATH_FIELDNAME_FORMAT % {'name': 'sort', },
             prefetched=None,
     ):
-        self.padchar = padchar
         _sequence_field = sequence_field if sequence_field else F('id')
-        path_filedname = QUERY_PATH_FIELDNAME_FORMAT % {'name': sort_name, }
         node_model = self.model.get_node_model()
 
         def child_values(roots, nodedata, prefetch=False):
@@ -311,7 +298,11 @@ class ProtoNodeQuerySet(QuerySet):
 
                 if base_ref_path in nodedata.keys():
                     yield f
-                elif self._LPad_py(f.pk, padsize) in nodedata.keys():
+                elif self._LPad_py(
+                    f.pk,
+                    padding_size=self.path_padding_size,
+                    padding_char=self.path_padding_char
+                ) in nodedata.keys():
                     yield f
 
                 if prefetch:
@@ -321,12 +312,18 @@ class ProtoNodeQuerySet(QuerySet):
                             'path_parent_ref': Value(
                                 int(f.pk), output_field=models.IntegerField()),
                             path_filedname: Concat(
-                                Value(base_path + sepchar),
-                                self._LPad_sql(_sequence_field, padsize),
+                                Value(base_path + self._path_seperator),
+                                self._LPad_sql(_sequence_field),
                             ),
                             QUERY_NODE_PATH: Concat(
-                                Value(base_ref_path + sepchar),
-                                self._LPad_sql(F('id'), padsize),
+                                Value(base_ref_path + self.path_seperator),
+                                self._LPad_sql(
+                                    F('id'),
+                                    # NOTE: these use class default size as we need consultancy
+                                    # incase we need to link calls to _sort_query
+                                    padding_size=self.path_padding_size,
+                                    padding_char=self.path_padding_char
+                                ),
                             ),
                             QUERY_DEPTH_FIELDNAME: Cast(
                                 Value(depth),
@@ -348,12 +345,16 @@ class ProtoNodeQuerySet(QuerySet):
                                 'path_parent_ref': Value(
                                     int(f.pk), output_field=models.IntegerField()),
                                 path_filedname: Concat(
-                                    Value(base_path + sepchar),
-                                    self._LPad_sql(_sequence_field, padsize),
+                                    Value(base_path + self._path_seperator),
+                                    self._LPad_sql(_sequence_field),
                                 ),
                                 QUERY_NODE_PATH: Concat(
-                                    Value(base_ref_path + sepchar),
-                                    self._LPad_sql(F('id'), padsize),
+                                    Value(base_ref_path + self.path_seperator),
+                                    self._LPad_sql(
+                                        F('id'),
+                                        padding_size=self.path_padding_size,
+                                        padding_char=self.path_padding_char
+                                    ),
                                 ),
                                 QUERY_DEPTH_FIELDNAME: Cast(
                                     Value(depth),
@@ -370,7 +371,7 @@ class ProtoNodeQuerySet(QuerySet):
             search_roots = []
             for node in prefetched:
                 if getattr(node, QUERY_DEPTH_FIELDNAME) == 0:
-                    setattr(node, path_filedname, self._LPad_py(node.id, padsize))
+                    setattr(node, path_filedname, self._LPad_py(node.id))
                     search_roots.append(node)
             annotations_fields = [
                 key
@@ -378,15 +379,24 @@ class ProtoNodeQuerySet(QuerySet):
                 if key not in [
                     QUERY_DEPTH_FIELDNAME,
                     QUERY_NODE_PATH
-                ] and key.startswith('dag_')
+                ]
             ]
         else:
             query_nodedata = dict(map(
-                lambda x: (self._LPad_py(x.pk, padsize), x),
+                lambda x: (self._LPad_py(
+                        x.pk,
+                        padding_size=self.path_padding_size,
+                        padding_char=self.path_padding_char
+                    ), x),
                 self))
             search_roots = node_model.objects.roots().annotate(**{
-                path_filedname: self._LPad_sql(F('id'), padsize),
-                QUERY_NODE_PATH: self._LPad_sql(F('id'), padsize),
+                path_filedname: self._LPad_sql(F('id')),
+                QUERY_NODE_PATH: self._LPad_sql(
+                    F('id'),
+                    padding_size=self.path_padding_size,
+                    padding_char=self.path_padding_char
+
+                ),
                 QUERY_DEPTH_FIELDNAME: Cast(
                     Value(0),
                     output_field=models.IntegerField()

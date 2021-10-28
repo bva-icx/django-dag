@@ -27,19 +27,16 @@ from django_cte import CTEQuerySet, With, CTEManager
 from django_delayed_union.base import DelayedQuerySetMethod
 from .base import BaseNode
 from .query import DagBaseDelayedUnionQuerySet
+from . import (
+    QUERY_PATH_FIELDNAME_FORMAT,
+    QUERY_DEPTH_FIELDNAME,
+    QUERY_NODE_PATH,
+)
 
 
 ProtoNodeManager = CTEManager
 ProtoEdgeManager = CTEManager
 ProtoEdgeQuerySet = CTEQuerySet
-
-QUERY_PATH_FIELDNAME_FORMAT = 'dag_%(name)s_path'
-QUERY_DEPTH_FIELDNAME = 'dag_depth'
-QUERY_NODE_PATH = 'dag_node_path'
-
-_PATH_PADDING_SIZE = 4
-_PATH_PADDING_CHAR = '0'
-_PATH_SEPERATOR = ','
 
 
 class SplitPassthroughMethod(DelayedQuerySetMethod):
@@ -53,6 +50,7 @@ class SplitPassthroughMethod(DelayedQuerySetMethod):
         assert kwargs.pop('roots', None) is None, "duplicate root"
         main_clone = main._clone()
         roots_clone = roots._clone()
+
         return obj._clone([
             getattr(main_clone, self.name)(*args, roots=roots_clone, **kwargs)
         ])
@@ -124,9 +122,9 @@ class CteSimpleConcatAnnotation(DagCteAnnotation):
             name: str,
             initial_sequence_field,
             next_sequence_field,
-            path_seperator: str = _PATH_SEPERATOR,
-            padsize: int = _PATH_PADDING_SIZE,
-            padding: str = _PATH_PADDING_CHAR,
+            path_seperator: str,
+            padding_size: int,
+            padding_char: str,
     ) -> None:
         """
         :param name: Name of the annotation  or CTE table column
@@ -135,20 +133,20 @@ class CteSimpleConcatAnnotation(DagCteAnnotation):
         :param next_sequence_field: An expression or F() used to get the next part of the
             combined path field.
         :param path_seperator (str): Character to put between fields
-        :param padsize (int): The number of characters that the field should be when padded
+        :param padding_size (int): The number of characters that the field should be when padded
         :param padding (str): character to pad the field
         """
         self.name = name
         self.initial_sequence_field = initial_sequence_field
         self.next_sequence_field = next_sequence_field
         self.path_seperator = path_seperator
-        self.padsize = padsize
-        self.padding = padding
+        self.padding_size = padding_size
+        self.padding_char = padding_char
 
     def _LPad(self, value):
         return LPad(
             Cast(value, output_field=models.TextField()),
-            self.padsize, Value(self.padding))
+            self.padding_size, Value(self.padding_char))
 
     def as_initial_expresion(self, cte):
         return (
@@ -172,16 +170,16 @@ class CteSimpleConcatAnnotation(DagCteAnnotation):
 
 
 class ProtoNodeQuerySet(CTEQuerySet):
+
     def __init__(self, *args, **kwargs):
-        self.path_seperator = _PATH_SEPERATOR
-        self.path_padding_character = _PATH_PADDING_CHAR
-        self.padding_size = _PATH_PADDING_SIZE
         super().__init__(*args, **kwargs)
 
-    def _LPad(self, value, padsize):
+    def _LPad(self, value, padding_size=None, padding_char=None):
+        padding_size = padding_size or self._padding_size
+        padding_char = padding_char or self._padding_char
         return LPad(
             Cast(value, output_field=models.TextField()),
-            padsize, Value(self.path_padding_character))
+            padding_size, Value(padding_char))
 
     def distinct_node(self, order_field: str, roots: QuerySet = None, **kwargs):
         """
@@ -222,25 +220,21 @@ class ProtoNodeQuerySet(CTEQuerySet):
         roots = roots.annotate(_visit_count=Value(1, output_field=models.IntegerField()))
         return DagDelayedUnionQuerySet(results, roots)
 
-    def with_pk_path(self, *args,
-            padsize=_PATH_PADDING_SIZE, padchar=_PATH_PADDING_CHAR, **kwargs):
+    def with_pk_path(self, *args, name=None, **kwargs):
         """
         Generates a query that does a top-to-bottom traversal without regard to any
         possible (left-to-right) ordering of the nodes
-
-        :param padsize int: Length of the field segment for each node in pits path
-            to it root.
         """
+        if name is None:
+            name = QUERY_PATH_FIELDNAME_FORMAT % {'name': 'pk', }
+
         return DagDelayedUnionQuerySet(
                 *self._sort_query(
                     *args,
-                    padsize=padsize,
-                    padchar=padchar,
-                    sort_name='pk',
+                    path_filedname=name,
                     **kwargs))
 
-    def with_sequence_path(self, *args,
-            padsize=_PATH_PADDING_SIZE, padchar=_PATH_PADDING_CHAR, **kwargs):
+    def with_sequence_path(self, *args, name=None, **kwargs):
         """
         Generates a query that add annotations for depth-first traversal to the nodes
 
@@ -249,9 +243,6 @@ class ProtoNodeQuerySet(CTEQuerySet):
         nodes.orderby('dag_sequence_path') produces as 'preorder (Root, Left, Right)' sort
 
         Nodes with multiple roots will be present in the results multiple time
-
-        :param padsize int: Length of the field segment for each node in pits path
-            to it root.
         """
         sequence_field = None
         if self.model.sequence_manager:
@@ -259,29 +250,23 @@ class ProtoNodeQuerySet(CTEQuerySet):
                 .get_edge_rel_sort_query_component(
                     self.model, 'child_id', 'parent_id'
                 )
+        if name is None:
+            name = QUERY_PATH_FIELDNAME_FORMAT % {'name': 'sequence', }
+
         return DagDelayedUnionQuerySet(
             *self._sort_query(
                 *args,
-                padsize=padsize,
-                sort_name='sequence',
-                padchar=padchar,
+                path_filedname=name,
                 sequence_field=sequence_field,
                 **kwargs))
 
     def _sort_query(
             self, *args,
-            padsize=_PATH_PADDING_SIZE,
-            padchar=_PATH_PADDING_CHAR,
-            sepchar=_PATH_SEPERATOR,
             sequence_field=None,
-            sort_name='sort',
+            path_filedname=QUERY_PATH_FIELDNAME_FORMAT % {'name': 'sort', },
             roots=None,
     ):
-
-        self.padchar = padchar
-        path_filedname = QUERY_PATH_FIELDNAME_FORMAT % {'name': sort_name, }
         node_model = self.model.get_node_model()
-
         if isinstance(self, EmptyQuerySet):
             self.annotate(**{
                 path_filedname: Value(None, output_field=models.IntegerField()),
@@ -308,13 +293,13 @@ class ProtoNodeQuerySet(CTEQuerySet):
                         'querypath',
                         F('parent_id'),
                         sequence_field if sequence_field else F('child_id'),
-                        path_seperator=self.path_seperator,
-                        padsize=padsize
+                        path_seperator=self._path_seperator,
+                        padding_size=self._padding_size,
+                        padding_char=self._padding_char,
                     ),
                 ],
-                padsize
             ),
-            name='nodePaths' + sort_name
+            name='nodePaths' + path_filedname
         )
 
         joins = {
@@ -336,13 +321,20 @@ class ProtoNodeQuerySet(CTEQuerySet):
 
         roots = roots \
             .annotate(**{
-                path_filedname: self._LPad(F('id'), padsize),
-                QUERY_NODE_PATH: self._LPad(F('id'), padsize),
+                path_filedname: self._LPad(F('id')),
+                QUERY_NODE_PATH: self._LPad(
+                    F('id'),
+                    # NOTE: these use class default size as we need consultancy
+                    # incase we need to link calls to _sort_query
+                    padding_size=self.path_padding_size,
+                    padding_char=self.path_padding_char
+                ),
                 QUERY_DEPTH_FIELDNAME: Value(0, output_field=models.IntegerField()),
             })
         return subnodes, roots
 
-    def _make_path_src_cte_fn(self, model, rootquery, sequence_fields: List[DagCteAnnotation], padsize):
+    def _make_path_src_cte_fn(self, model, rootquery,
+            sequence_fields: List[DagCteAnnotation]):
         """
         Build the CTE query function for dag path navigation
 
@@ -356,8 +348,9 @@ class ProtoNodeQuerySet(CTEQuerySet):
                 'path',
                 F('parent_id'),
                 F('child_id'),
-                self.path_seperator,
-                padsize
+                path_seperator=self.path_seperator,
+                padding_size=self.path_padding_size,
+                padding_char=self.path_padding_char
             ),
             CteRawAnnotation(
                 'depth',

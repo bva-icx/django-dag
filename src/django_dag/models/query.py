@@ -9,7 +9,16 @@ class DagSortOrder(IntEnum):
     NODE_SEQUENCE = auto()
 
 
+DEFAULT_PATH_PADDING_SIZE = 4
+DEFAULT_PATH_PADDING_CHAR = '0'
+DEFAULT_PATH_SEPERATOR = ','
+
+
 class BaseNodeQuerySet(backend.ProtoNodeQuerySet):
+    path_padding_size = DEFAULT_PATH_PADDING_SIZE
+    path_padding_char = DEFAULT_PATH_PADDING_CHAR
+    path_seperator = DEFAULT_PATH_SEPERATOR
+
     def roots(self, node=None):
         """
         Limits the current queryset those which are root nodes.
@@ -114,8 +123,18 @@ class BaseNodeQuerySet(backend.ProtoNodeQuerySet):
             DEFAULT:: For sortable dags this is DagSortOrder.NODE_SEQUENCE else DagSortOrder.NODE_PK
             NODE_PK:: Add the basic annotations 'dag_pk_path'
             NODE_SEQUENCE:: The basic annotations and 'dag_sequence_path'
+
+        :param padsize int: Number of characters of each level of the dag path
+        :param padchar str: Character used to pad the path with
+        :param sepchar str: Character to separate
+        :param name str: The resultant annnotations name which will contain the path
+
         :return: QuerySet
         """
+        self._padding_size = kwargs.pop('padsize', self.path_padding_size)
+        self._padding_char = kwargs.pop('padchar', self.path_padding_char)
+        self._path_seperator = kwargs.pop('sepchar', self.path_seperator)
+
         if method == DagSortOrder.DEFAULT:
             method = DagSortOrder.NODE_SEQUENCE if (
                 self.model.sequence_manager) else DagSortOrder.NODE_PK
