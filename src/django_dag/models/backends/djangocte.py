@@ -23,7 +23,7 @@ from django.db.models import (
     Window
 )
 from django_dag.exceptions import NodeNotReachableException
-from django_cte import CTEQuerySet, With, CTEManager
+from django_cte import __version__ as cte_version, CTEQuerySet, With
 from django_delayed_union.base import DelayedQuerySetMethod
 from .base import BaseNode
 from .query import DagBaseDelayedUnionQuerySet
@@ -32,6 +32,19 @@ from . import (
     QUERY_DEPTH_FIELDNAME,
     QUERY_NODE_PATH,
 )
+
+
+if cte_version < "1.1.6":
+    # NOTE: replace broken CTEManager
+    class CTEManager(models.Manager):
+        """Manager for models that perform CTE queries"""
+
+        @classmethod
+        def from_queryset(cls, queryset_class, class_name=None):
+            assert issubclass(queryset_class, CTEQuerySet)
+            return super().from_queryset(queryset_class, class_name=class_name)
+else:
+    from django_cte import CTEManager
 
 
 ProtoNodeManager = CTEManager
@@ -299,7 +312,7 @@ class ProtoNodeQuerySet(CTEQuerySet):
                     ),
                 ],
             ),
-            name='nodePaths' + path_filedname
+            name='node_paths' + path_filedname
         )
 
         joins = {
@@ -551,7 +564,7 @@ class ProtoNode(BaseNode):
 
         node_paths_cte = With.recursive(
             source.make_path_src_cte_fn(element, target),
-            name='nodePaths'
+            name='node_paths'
         )
 
         def qFilter(cte):
@@ -564,7 +577,7 @@ class ProtoNode(BaseNode):
                 filter_fn=qFilter,
                 list_col=node_paths_cte.col.path
             ),
-            name='orderedListItems'
+            name='ordered_list_items'
         )
 
         datarows = orderlists_cte.join(result_model, id=orderlists_cte.col.item_id) \
