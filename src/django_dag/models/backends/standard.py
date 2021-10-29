@@ -15,6 +15,7 @@ from django.db.models.functions import (
     Cast,
     Concat,
     LPad,
+    RPad,
 )
 from django_delayed_union.base import DelayedQuerySetMethod
 from .base import BaseNode
@@ -148,16 +149,36 @@ class ProtoNodeQuerySet(QuerySet):
         super().__init__(*args, **kwargs)
 
     def _LPad_sql(self, value, padding_size=None, padding_char=None):
-        padding_size = padding_size or self._padding_size
-        padding_char = padding_char or self._padding_char
         return LPad(
             Cast(value, output_field=models.TextField()),
             padding_size, Value(padding_char))
 
     def _LPad_py(self, value, padding_size=None, padding_char=None):
-        padding_size = padding_size or self._padding_size
-        padding_char = padding_char or self._padding_char
         return str(value).rjust(padding_size, padding_char)
+
+    def _RPad_sql(self, value, padding_size=None, padding_char=None):
+        return RPad(
+            Cast(value, output_field=models.TextField()),
+            padding_size, Value(padding_char))
+
+    def _RPad_py(self, value, padding_size=None, padding_char=None):
+        return str(value).ljust(padding_size, padding_char)
+
+    def _padding_fn(self, padding_size, sql=True):
+        if padding_size is None or padding_size == 0:
+            # No Padding
+            if sql:
+                return lambda x, **k: Cast(x, output_field=models.CharField())
+            return lambda x, **k: x
+        elif padding_size > 0:
+            return self._LPad_sql if sql else self._LPad_py
+        return self._RPad_sql if sql else self._RPad_py
+
+    def Pad(self, value, padding_size=None, padding_char=None, sql=True):
+        padding_size = padding_size if padding_size is not None else self._padding_size
+        padding_char = padding_char if padding_char is not None else self._padding_char
+        return self._padding_fn(padding_size, sql=sql)(
+            value, padding_size=abs(padding_size), padding_char=padding_char)
 
     def distinct_node(self, order_field: str, roots: QuerySet = None, **kwargs):
         """
@@ -298,10 +319,11 @@ class ProtoNodeQuerySet(QuerySet):
 
                 if base_ref_path in nodedata.keys():
                     yield f
-                elif self._LPad_py(
+                elif self.Pad(
                     f.pk,
                     padding_size=self.path_padding_size,
-                    padding_char=self.path_padding_char
+                    padding_char=self.path_padding_char,
+                    sql=False
                 ) in nodedata.keys():
                     yield f
 
@@ -313,16 +335,16 @@ class ProtoNodeQuerySet(QuerySet):
                                 int(f.pk), output_field=models.IntegerField()),
                             path_filedname: Concat(
                                 Value(base_path + self._path_seperator),
-                                self._LPad_sql(_sequence_field),
+                                self.Pad(_sequence_field),
                             ),
                             QUERY_NODE_PATH: Concat(
                                 Value(base_ref_path + self.path_seperator),
-                                self._LPad_sql(
+                                self.Pad(
                                     F('id'),
                                     # NOTE: these use class default size as we need consultancy
                                     # incase we need to link calls to _sort_query
                                     padding_size=self.path_padding_size,
-                                    padding_char=self.path_padding_char
+                                    padding_char=self.path_padding_char,
                                 ),
                             ),
                             QUERY_DEPTH_FIELDNAME: Cast(
@@ -346,11 +368,11 @@ class ProtoNodeQuerySet(QuerySet):
                                     int(f.pk), output_field=models.IntegerField()),
                                 path_filedname: Concat(
                                     Value(base_path + self._path_seperator),
-                                    self._LPad_sql(_sequence_field),
+                                    self.Pad(_sequence_field),
                                 ),
                                 QUERY_NODE_PATH: Concat(
                                     Value(base_ref_path + self.path_seperator),
-                                    self._LPad_sql(
+                                    self.Pad(
                                         F('id'),
                                         padding_size=self.path_padding_size,
                                         padding_char=self.path_padding_char
@@ -371,7 +393,7 @@ class ProtoNodeQuerySet(QuerySet):
             search_roots = []
             for node in prefetched:
                 if getattr(node, QUERY_DEPTH_FIELDNAME) == 0:
-                    setattr(node, path_filedname, self._LPad_py(node.id))
+                    setattr(node, path_filedname, self.Pad(node.id, sql=False))
                     search_roots.append(node)
             annotations_fields = [
                 key
@@ -383,19 +405,19 @@ class ProtoNodeQuerySet(QuerySet):
             ]
         else:
             query_nodedata = dict(map(
-                lambda x: (self._LPad_py(
+                lambda x: (self.Pad(
                         x.pk,
                         padding_size=self.path_padding_size,
-                        padding_char=self.path_padding_char
+                        padding_char=self.path_padding_char,
+                        sql=False
                     ), x),
                 self))
             search_roots = node_model.objects.roots().annotate(**{
-                path_filedname: self._LPad_sql(F('id')),
-                QUERY_NODE_PATH: self._LPad_sql(
+                path_filedname: self.Pad(F('id')),
+                QUERY_NODE_PATH: self.Pad(
                     F('id'),
                     padding_size=self.path_padding_size,
                     padding_char=self.path_padding_char
-
                 ),
                 QUERY_DEPTH_FIELDNAME: Cast(
                     Value(0),

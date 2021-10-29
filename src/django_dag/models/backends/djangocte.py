@@ -5,6 +5,7 @@ from django.db.models.functions import (
     Cast,
     Concat,
     LPad,
+    RPad,
     StrIndex,
     Substr,
     RowNumber
@@ -159,15 +160,29 @@ class CteSimpleConcatAnnotation(DagCteAnnotation):
     def _LPad(self, value):
         return LPad(
             Cast(value, output_field=models.TextField()),
-            self.padding_size, Value(self.padding_char))
+            abs(self.padding_size), Value(self.padding_char))
+
+    def _RPad(self, value):
+        return RPad(
+            Cast(value, output_field=models.TextField()),
+            abs(self.padding_size), Value(self.padding_char))
+
+    @property
+    def padding_fn(self):
+        if self.padding_size is None or self.padding_size == 0:
+            # No Padding
+            return lambda x: Cast(x, output_field=models.CharField())
+        elif self.padding_size > 0:
+            return self._LPad
+        return self._RPad
 
     def as_initial_expresion(self, cte):
         return (
             self.name,
             Concat(
-                self._LPad(self.initial_sequence_field),
+                self.padding_fn(self.initial_sequence_field),
                 Value(self.path_seperator),
-                self._LPad(self.next_sequence_field)
+                self.padding_fn(self.next_sequence_field)
             )
         )
 
@@ -177,7 +192,7 @@ class CteSimpleConcatAnnotation(DagCteAnnotation):
             Concat(
                 getattr(cte.col, self.name),
                 Value(self.path_seperator),
-                self._LPad(self.next_sequence_field),
+                self.padding_fn(self.next_sequence_field),
                 output_field=models.TextField(),)
         )
 
@@ -188,11 +203,28 @@ class ProtoNodeQuerySet(CTEQuerySet):
         super().__init__(*args, **kwargs)
 
     def _LPad(self, value, padding_size=None, padding_char=None):
-        padding_size = padding_size or self._padding_size
-        padding_char = padding_char or self._padding_char
         return LPad(
             Cast(value, output_field=models.TextField()),
             padding_size, Value(padding_char))
+
+    def _RPad(self, value, padding_size=None, padding_char=None):
+        return RPad(
+            Cast(value, output_field=models.TextField()),
+            padding_size, Value(padding_char))
+
+    def _padding_fn(self, padding_size):
+        if padding_size is None or padding_size == 0:
+            # No Padding
+            return lambda x, **k: Cast(x, output_field=models.TextField())
+        elif padding_size > 0:
+            return self._LPad
+        return self._RPad
+
+    def Pad(self, value, padding_size=None, padding_char=None):
+        padding_size = padding_size if padding_size is not None else self._padding_size
+        padding_char = padding_char if padding_char is not None else self._padding_char
+        return self._padding_fn(padding_size)(
+            value, padding_size=abs(padding_size), padding_char=padding_char)
 
     def distinct_node(self, order_field: str, roots: QuerySet = None, **kwargs):
         """
@@ -334,8 +366,8 @@ class ProtoNodeQuerySet(CTEQuerySet):
 
         roots = roots \
             .annotate(**{
-                path_filedname: self._LPad(F('id')),
-                QUERY_NODE_PATH: self._LPad(
+                path_filedname: self.Pad(F('id')),
+                QUERY_NODE_PATH: self.Pad(
                     F('id'),
                     # NOTE: these use class default size as we need consultancy
                     # incase we need to link calls to _sort_query
